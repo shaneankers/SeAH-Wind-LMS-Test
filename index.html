@@ -1329,7 +1329,7 @@ body.player-mode .badge.orange{
 </div>
 
 <script>
-const SUPABASE_URL="https://kstbfgvvxzmxkyxhxbwe.supabase.co/rest/v1/";
+const SUPABASE_URL="https://kstbfgvvxzmxkyxhxbwe.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_uB4gUf5Ms0WR7KRcm__C7g_G6HxUvpQ";
 const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let onlineReady=false;
@@ -1337,7 +1337,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v27";
+const storeKey="seah_wind_lms_TEST_v1";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,manualPotAdjustment:0,entryFee:5,deadline:"Saturday 12:00",deadlineAt:"",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -1363,9 +1363,9 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  },
  players:[],champions:[]
 };
-const AUTH_STORAGE_KEY="seah_auth_user_current";
-const REMEMBERED_USERNAME_KEY="seah_remembered_username";
-const SOUND_EFFECTS_KEY="seah_sound_effects_enabled";
+const AUTH_STORAGE_KEY="seah_test_auth_user_current";
+const REMEMBERED_USERNAME_KEY="seah_test_remembered_username";
+const SOUND_EFFECTS_KEY="seah_test_sound_effects_enabled";
 let teamStatisticsRows=[];
 let teamStatisticsLoading=false;
 let teamStatisticsError="";

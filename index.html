@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>SeAH Wind LMS</title>
+<title>SeAH Wind LMS — TEST</title>
 <!-- v105 admin/player visual alignment and player polls -->
 <meta name="theme-color" content="#0f172a"/>
 <link rel="manifest" href="manifest.webmanifest"/>
@@ -1260,13 +1260,18 @@ body.player-mode .badge.orange{
   to{opacity:1;transform:scale(1);}
 }
 
+
+/* TEST environment + staged feature pack */
+.test-env-badge{display:inline-flex;align-items:center;margin-left:10px;padding:6px 10px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:1000;letter-spacing:.07em;text-transform:uppercase;box-shadow:0 8px 20px rgba(220,38,38,.28)}
+.processed-result{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;border-radius:12px;background:#dcfce7;color:#166534;font-size:13px;font-weight:1000;border:1px solid #bbf7d0}
+.waiting-next-round{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;border-radius:12px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:1000;border:1px solid #fde68a}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="loginScreen"></div>
 <div class="app" id="appScreen" style="display:none">
-<header class="header"><div class="logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><div><h1>SeAH Wind LMS</h1><p class="sub">Last Man Standing</p><div id="onlineStatus" style="margin-top:6px;display:inline-flex;border-radius:999px;padding:5px 9px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:950">Database loading...</div></div></header>
+<header class="header"><div class="logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><div><h1>SeAH Wind LMS <span class="test-env-badge">TEST</span></h1><p class="sub">Last Man Standing · Safe test environment</p><div id="onlineStatus" style="margin-top:6px;display:inline-flex;border-radius:999px;padding:5px 9px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:950">Database loading...</div></div></header>
 <div class="shell"><aside class="sidebar"><div class="profile"><strong id="sideTitle">Admin</strong><div class="tiny" id="sideSub"></div></div><div class="nav" id="nav"></div></aside><main class="main"><div class="topline"><p class="title" id="pageTitle">Dashboard</p><div class="muted" id="pageSub">Competition #1 · Rollover 0 · Round 1</div></div><div class="body" id="content"></div></main></div>
 </div>
 <div id="toast" class="toast"></div>
@@ -2328,6 +2333,21 @@ async function notifyGroup(type,targets,message,templateData={}){
  render();
 }
 
+async function sendAutomaticPlayerPush(player,title,message,eventType="status"){
+ if(!player||!player.id||player.notifications===false)return false;
+ try{
+  const {data,error}=await supabaseClient.functions.invoke("push-notifications",{
+   body:{type:"direct",event:eventType,target_user_id:player.id,title:String(title||"SeAH Wind LMS"),message:String(message||"")}
+  });
+  if(error)throw error;
+  if(data&&data.success===false)throw new Error(data.error||data.message||"Push was not sent.");
+  return true;
+ }catch(e){
+  console.warn("Automatic player push was not delivered",eventType,player.name,e);
+  return false;
+ }
+}
+
 function notifyUnpaid(){
  const targets=announcementTargets("unpaid");
  return notifyGroup("unpaid",targets,noteText("unpaid"));
@@ -2528,19 +2548,25 @@ function players(){
  </div>`;
 }
 function round(){
+ const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
  return `<div class="card">
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
-     ${alive().map(p=>{const i=state.players.indexOf(p);return `<div class="round-compact-row final-correct">
+     ${roundPlayers.map(p=>{const i=state.players.indexOf(p);const processed=p.result==="processed_win";return `<div class="round-compact-row final-correct">
        <div class="round-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="round-controls-8020">
-         <div><label>Team</label><select onchange="setPick(${i},this.value)"><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
-         <div><label>Result</label><select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select></div>
+         <div><label>Team</label><select onchange="setPick(${i},this.value)" ${processed?'disabled':''}><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
+         <div><label>Result</label>${processed?`<div class="processed-result">🟩 Processed</div>`:`<select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select>`}</div>
        </div>
-     </div>`}).join("")||`<div class="notice">No alive players.</div>`}
+     </div>`}).join("")||`<div class="notice">No active Round ${state.round} picks.</div>`}
+     ${alive().filter(p=>p.result==="waiting_next_round").map(p=>`<div class="item"><div><div class="item-title">${displayNameHtml(p)}</div><div class="tiny">Round 1 buy-back approved</div></div><div class="waiting-next-round">Waiting for Round 2</div></div>`).join("")}
    </div>
  </div>
- <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="secondary" onclick="startNextCompetition()">Start New Competition</button></div>`;
+ <div class="actions">
+  <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
+  <button class="secondary" onclick="startNextRound()">Start Next Round</button>
+  <button class="secondary" onclick="startNextCompetition()">Start New Competition</button>
+ </div>`;
 }
 
 
@@ -2709,7 +2735,7 @@ async function closeActivePoll(){
 }
 
 function buyBackEligible(p){
- return !!(p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&Number(state.round)===2&&p.buyBackUsed!==true);
+ return !!(p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&(Number(state.round)===1||Number(state.round)===2)&&p.buyBackUsed!==true);
 }
 async function loadBuyBackData(forceRender=false){
  if(!authUser||!authUser.user_id||buyBackLoading)return;
@@ -2754,14 +2780,20 @@ async function requestBuyBack(){
 }
 async function approveBuyBack(requestId){
  if(!confirm("Confirm payment has been received and approve this buy-back?"))return;
+ const request=(buyBackRequests||[]).find(r=>String(r.id)===String(requestId));
+ const player=request?state.players.find(p=>p.id===request.user_id):null;
  try{
   const {data,error}=await supabaseClient.rpc("approve_round1_buy_back",{p_admin_user_id:authUser.user_id,p_request_id:requestId});
   if(error)throw error;
   const result=Array.isArray(data)?data[0]:data;
   if(!result?.success)throw new Error(result?.message||"Approval failed.");
-  toast("Buy-back approved and player reinstated.");
-  await syncUsersFromSupabase();
-  await loadBuyBackData(true);
+  await syncUsersFromSupabase();await loadBuyBackData(false);
+  const restored=player?state.players.find(p=>p.id===player.id):null;
+  const name=request?.display_name||request?.username||restored?.name||"Player";
+  const fee=Number(request?.fee||state.entryFee);
+  await sendAutomaticPlayerPush(restored||player,"🔄 Buy-Back Approved",Number(state.round)===1?`Your £${fee} Round 1 buy-back has been approved. You are back in the competition and will be able to pick when Round 2 starts.`:`Your £${fee} Round 1 buy-back has been approved. You are back in the competition and can continue in Round 2.`,"buyback_approved");
+  alert(`Buy-Back Approved ✓\n\n${name} has been reinstated and is alive in the competition.\n£${fee} added to the prize pot.`);
+  toast("Buy-back approved.");render();
  }catch(e){console.error(e);toast(e.message||"Buy-back approval failed.");}
 }
 async function declineBuyBack(requestId){
@@ -2771,16 +2803,22 @@ async function declineBuyBack(requestId){
   if(error)throw error;
   const result=Array.isArray(data)?data[0]:data;
   if(!result?.success)throw new Error(result?.message||"Decline failed.");
+  const request=(buyBackRequests||[]).find(r=>String(r.id)===String(requestId));
+  const player=request?state.players.find(p=>p.id===request.user_id):null;
+  await sendAutomaticPlayerPush(player,"Buy-Back Request Declined","Your Round 1 buy-back request was declined. Contact the administrator if you believe this is incorrect.","buyback_declined");
   toast("Buy-back request declined.");
   await loadBuyBackData(true);
  }catch(e){console.error(e);toast(e.message||"Could not decline request.");}
 }
 function buyBackPlayerCard(p){
+ if(p&&p.buyBackUsed===true&&p.result==="waiting_next_round"){
+  return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge green">Approved ✓</span></div><div class="card-body"><div class="notice"><strong>You are back in the competition.</strong><br>Your buy-back has been approved. You will be able to submit your next pick when Round 2 starts.</div></div></div>`;
+ }
  if(!buyBackEligible(p))return "";
  const status=String(currentBuyBackRequest?.status||"");
  if(status==="pending")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Buy-back requested.</strong><br>Please pay the administrator £${state.entryFee}. You will be reinstated once payment is confirmed.</div></div></div>`;
  if(status==="declined")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice">Your buy-back request was declined. Contact the administrator if you believe this is incorrect.</div></div></div>`;
- return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You may request one buy-back before the Round 2 deadline. Your Round 1 team will remain unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
+ return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You may request your £${state.entryFee} buy-back now. Once approved, you will return for Round 2 and your Round 1 team will remain unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
 }
 function adminBuyBackPanel(){
  const pending=(buyBackRequests||[]).filter(r=>r.status==="pending");
@@ -3747,6 +3785,7 @@ async function approvePlayer(i){
    toast(p.name+" approved.");
   }
   await saveNow();
+  await sendAutomaticPlayerPush(p,"✅ Account Approved",shouldQueueForNextCompetition(p)?"Your SeAH Wind LMS account has been approved. You will enter from the next competition.":"Your SeAH Wind LMS account has been approved. You are ready to take part.","approved");
  }catch(e){
   console.error(e);
   toast("Could not approve player: "+(e.message||"unknown error"));
@@ -3771,6 +3810,7 @@ async function approveAndPay(i){
    toast(p.name+" approved and marked paid.");
   }
   await saveNow();
+  await sendAutomaticPlayerPush(p,shouldQueueForNextCompetition(p)?"✅ Account Approved":"✅ Approved & Payment Received",shouldQueueForNextCompetition(p)?"Your account has been approved. You will enter from the next competition.":`Your account is approved and your £${state.entryFee} entry payment has been confirmed.`,"approved_paid");
  }catch(e){
   console.error(e);
   toast("Could not approve player: "+(e.message||"unknown error"));
@@ -3889,6 +3929,7 @@ async function togglePaid(i){
   }
 
   toast(`${p.name} marked ${targetPaid?"paid":"unpaid"}.`);
+  await sendAutomaticPlayerPush(confirmed||p,targetPaid?"💷 Payment Received":"Payment Status Updated",targetPaid?`Your £${state.entryFee} SeAH Wind LMS entry payment has been confirmed.`:"Your SeAH Wind LMS payment status has been changed to unpaid. Contact the administrator if this is unexpected.",targetPaid?"paid":"unpaid_status");
   render();
  }catch(e){
   console.error("Payment status save failed",e);
@@ -3947,6 +3988,7 @@ async function toggleAlive(i){
  }
 
  await saveNow();
+ await sendAutomaticPlayerPush(p,p.alive?"✅ Competition Status Updated":"❌ Eliminated",p.alive?"The administrator has restored you as alive in the SeAH Wind LMS competition.":(Number(state.round)===1?`You have been eliminated in Round 1. A £${state.entryFee} buy-back may be available in the app.`:"You have been eliminated from the SeAH Wind LMS competition."),p.alive?"restored":"eliminated");
 }
 async function unlockPick(i){
  const p=state.players[i];
@@ -3956,6 +3998,7 @@ async function unlockPick(i){
  p.result="pending";
  toast(p.name+"'s pick cleared and unlocked.");
  await saveNow();
+ await sendAutomaticPlayerPush(p,"🔓 Pick Unlocked",`Your Round ${state.round} pick has been unlocked by the administrator. Please submit your new selection before the deadline.`,"pick_unlocked");
 }
 function renamePlayer(i){
  const p=state.players[i];
@@ -4024,7 +4067,18 @@ async function resetPlayerPassword(i){
 }
 
 async function setPick(i,v){const p=state.players[i];const old=p.pick;p.pick=v;if(v&&v!==old)addActivity("pick",p.name+" picked "+v,"Admin updated Round "+state.round+" pick");await saveNow()}
-async function setResult(i,v){state.players[i].result=v;await saveNow()}
+async function setResult(i,v){
+ const source=state.players[i];
+ if(!source)return toast("Player not found.");
+ if(source.result==="processed_win")return toast("That result has already been processed.");
+ const team=String(source.pick||"").trim();
+ if(!team){source.result=v;await saveNow();return;}
+ const affected=state.players.filter(p=>p&&p.approved&&p.alive&&String(p.pick||"").trim()===team&&p.result!=="processed_win"&&p.result!=="waiting_next_round");
+ affected.forEach(p=>p.result=v);
+ addActivity("round",team+" marked "+(v==="win"?"WIN":v==="lose"?"LOSS":"pending"),affected.length+" pick"+(affected.length===1?"":"s")+" updated automatically");
+ await saveNow();
+ toast(`${team}: ${affected.length} pick${affected.length===1?"":"s"} updated.`);
+}
 function chooseTempPick(v){window.tempPick=v;render()}
 async function confirmPlayerPick(){
  const p=currentPlayer();
@@ -4074,94 +4128,102 @@ async function confirmPlayerPick(){
   toast(e.message||"Pick could not be submitted.");
  }
 }
-async function processRound(){
- const pending=alive().filter(p=>p.result==="pending");
- if(pending.length){
-  toast("Mark result for: "+pending.map(p=>p.name).join(", "));
-  return;
- }
+async function recordPartialRoundStatistics(players){
+ const rows=(players||[]).filter(p=>p&&p.id&&p.pick&&(p.result==="win"||p.result==="lose")).map(p=>({
+  user_id:p.id,competition_number:Number(state.competition)||1,rollover_number:Number(state.rollover)||0,round_number:Number(state.round)||1,team:String(p.pick),result:p.result==="win"?"win":"lose"
+ }));
+ if(!rows.length)return true;
+ const {error}=await supabaseClient.rpc("record_team_pick_history",{p_rows:rows});
+ if(error)throw error;
+ return true;
+}
 
- const teamResults={};
- const conflicts=[];
+async function processInputtedResults(){
+ const candidates=alive().filter(p=>p.result==="win"||p.result==="lose");
+ if(!candidates.length)return toast("No new 🟩 or 🟥 results have been inputted.");
 
- alive().forEach(p=>{
-  if(!p.pick)return;
-  if(!teamResults[p.pick]){
-   teamResults[p.pick]=p.result;
-  }else if(teamResults[p.pick]!==p.result){
-   conflicts.push(p.pick);
+ const byTeam=new Map(),conflicts=[];
+ candidates.forEach(p=>{const team=String(p.pick||"").trim();if(!team)return;const prev=byTeam.get(team);if(prev&&prev!==p.result)conflicts.push(team);byTeam.set(team,p.result);});
+ if(conflicts.length)return toast("Result mismatch for: "+[...new Set(conflicts)].join(", "));
+
+ const snapshot=candidates.map(p=>({player:p,result:p.result,pick:p.pick}));
+ try{
+  await recordPartialRoundStatistics(candidates);
+  candidates.forEach(p=>{
+   if(p.pick&&!p.previous.includes(p.pick))p.previous.push(p.pick);
+   if(p.result==="lose"){p.alive=false;p.outRound=state.round;p.outPick=p.pick||"No Pick";p.result="lose";p.locked=true;}
+   else{p.result="processed_win";p.locked=true;}
+  });
+  addActivity("round","Inputted results processed",`${candidates.length} player result${candidates.length===1?"":"s"} processed in Round ${state.round}`);
+  await saveNow();
+  await loadTeamStatistics(false);
+  for(const item of snapshot){
+   const p=item.player;
+   if(item.result==="win")await sendAutomaticPlayerPush(p,"🟩 YOU'RE THROUGH!",`Your ${item.pick} pick won. You remain alive in the competition.`,"result_win");
+   else await sendAutomaticPlayerPush(p,"❌ Eliminated",Number(state.round)===1?`Your ${item.pick||"Round 1"} pick has lost. You are eliminated, but a £${state.entryFee} Round 1 buy-back is available in the app.`:`Your ${item.pick||"team"} pick has lost and you have been eliminated from the competition.`,Number(state.round)===1?"round1_eliminated":"eliminated");
   }
- });
-
- if(conflicts.length){
-  toast("Result mismatch for: "+[...new Set(conflicts)].join(", "));
-  return;
+  toast(`${candidates.length} inputted result${candidates.length===1?"":"s"} processed. Round ${state.round} remains open.`);
+  await loadBuyBackData(false);render();
+ }catch(e){
+  console.error("Partial result processing failed",e);
+  toast("Results were not processed: "+(e.message||"unknown error"));
+  await syncUsersFromSupabase();render();
  }
+}
 
- const before=alive().length;
+async function startNextRound(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(alive().some(p=>p.result==="win"||p.result==="lose"))return toast("Process the inputted 🟩/🟥 results first.");
+ const waitingResults=alive().filter(p=>p.result!=="waiting_next_round"&&p.result!=="processed_win"&&p.pick&&p.result==="pending");
+ if(waitingResults.length)return toast("Results are still pending for: "+[...new Set(waitingResults.map(p=>p.pick).filter(Boolean))].join(", "));
+ if(!confirm(`Finish Round ${state.round} and start the next round? Players with no pick will be eliminated.`))return;
+
+ const oldRound=Number(state.round)||1;
+ const missed=alive().filter(p=>p.result!=="waiting_next_round"&&!p.pick);
+ missed.forEach(p=>{p.alive=false;p.outRound=oldRound;p.outPick="No Pick";p.result="lose";p.locked=true;});
+ const readyBuyBacks=alive().filter(p=>p.result==="waiting_next_round");
+ const survivors=alive();
 
  try{
-  await recordCompletedRoundStatistics();
-  await loadTeamStatistics(false);
- }catch(e){
-  console.error("Could not record round statistics",e);
-  toast("Round was not processed because statistics could not be saved. Check the v101 SQL setup.");
-  return;
- }
-
- alive().forEach(p=>{
-  if(p.pick&&!p.previous.includes(p.pick))p.previous.push(p.pick);
-
-  if(!p.pick||p.result==="lose"){
-   p.alive=false;
-   p.outRound=state.round;
-   p.outPick=p.pick||"No Pick";
+  if(survivors.length===0){
+   state.potCarryover=(state.potCarryover||0)+(paid().length*state.entryFee);
+   state.rollover=(state.rollover||0)+1;state.round=oldRound+1;
+   state.players.filter(p=>p.approved&&!isQueuedForNextCompetition(p)).forEach(p=>{p.alive=true;p.paid=false;p.outRound=null;p.outPick=null;p.pick="";p.locked=false;p.result="pending";});
+   addActivity("round","Rollover "+state.rollover+" started","Everyone is back in and payment is due again");
+   addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Collect payment again from everyone who is back in.");
+   await saveNow();
+   for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated","You missed the Round "+oldRound+" pick deadline and have been eliminated.","missed_deadline");
+   toast("Rollover "+state.rollover+" started.");render();return;
   }
 
-  p.pick="";
-  p.locked=false;
-  p.result="pending";
- });
+  if(survivors.length===1){
+   const winner=survivors[0];
+   winner.wins=Number(winner.wins||0)+1;
+   const champRecord={id:winner.id,name:winner.name,comp:state.competition,rollover:state.rollover||0};
+   if(!(state.champions||[]).some(c=>(c.id===champRecord.id||c.name===champRecord.name)&&Number(c.comp)===Number(champRecord.comp)&&Number(c.rollover||0)===Number(champRecord.rollover||0)))state.champions.push(champRecord);
+   await saveChampionRecord(champRecord);
+   addActivity("round","Winner found: "+winner.name,"Competition #"+state.competition);
+   addAdminAlert("Winner found","Winner: "+winner.name+". Sort the prize money, then start the next competition when ready.");
+   await saveNow();
+   await sendAutomaticPlayerPush(winner,"🏆 WINNER!",`Congratulations! You have won SeAH Wind LMS Competition #${state.competition}.`,"winner");
+   for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated",oldRound===1?`You missed the Round 1 deadline and have been eliminated. A £${state.entryFee} buy-back may be available in the app.`:`You missed the Round ${oldRound} deadline and have been eliminated.`,oldRound===1?"round1_eliminated":"missed_deadline");
+   toast("Winner: "+winner.name);page="playerHall";render();return;
+  }
 
- const s=alive();
-
- if(s.length===1){
-  s[0].wins++;
-  const champRecord={id:s[0].id,name:s[0].name,comp:state.competition,rollover:state.rollover||0};
-  const champExists=(state.champions||[]).some(c=>(c.id===champRecord.id||c.name===champRecord.name)&&Number(c.comp)===Number(champRecord.comp)&&Number(c.rollover||0)===Number(champRecord.rollover||0));
-  if(!champExists)state.champions.push(champRecord);
-  await saveChampionRecord(champRecord);
-  addActivity("round","Winner found: "+s[0].name,"Competition #"+state.competition);
-  addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
-  alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
-  toast("Winner: "+s[0].name);
-  page="playerHall";
- }else if(s.length===0&&before>0){
-  state.potCarryover=(state.potCarryover||0)+(paid().length*state.entryFee);
-  state.rollover=(state.rollover||0)+1;
-  state.round++;
-  state.players.filter(p=>p.approved&&!isQueuedForNextCompetition(p)).forEach(p=>{
-   p.alive=true;
-   p.paid=false;
-   p.outRound=null;
-   p.outPick=null;
-   p.pick="";
-   p.locked=false;
-   p.result="pending";
-  });
-  addActivity("round","Rollover "+state.rollover+" started","Everyone is back in and payment is due again");
-  addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Admin action needed: send rollover notification and collect payment again from everyone who is back in.");
-  alert("Rollover started.\n\nAdmin action needed: collect payment again from everyone who is back in.");
-  toast("Rollover "+state.rollover+" started. Everyone is back in and payment is due again.");
- }else{
-  state.round++;
-  addActivity("round","Round processed","Moved to Round "+state.round);
-  toast("Round processed.");
+  state.round=oldRound+1;
+  survivors.forEach(p=>{p.pick="";p.locked=false;p.result="pending";});
+  addActivity("round","Round "+oldRound+" completed","Round "+state.round+" started");
+  await saveNow();
+  for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated",oldRound===1?`You missed the Round 1 deadline and have been eliminated. A £${state.entryFee} buy-back is available in the app.`:`You missed the Round ${oldRound} deadline and have been eliminated.`,oldRound===1?"round1_eliminated":"missed_deadline");
+  for(const p of readyBuyBacks)await sendAutomaticPlayerPush(p,"🔄 Buy-Back Active",`Round ${state.round} has started. Your buy-back is active and you can now submit your pick.`,"buyback_round_ready");
+  toast("Round "+state.round+" started.");render();
+ }catch(e){
+  console.error("Start next round failed",e);
+  toast("Could not start the next round: "+(e.message||"unknown error"));
+  await syncUsersFromSupabase();render();
  }
-
- await saveNow();
 }
-async function nextRoundOnly(){state.round++;await saveNow()}
+
 async function startNextCompetition(){
  if(!confirm("Start Competition #"+(state.competition+1)+"?\n\nThis will reset approved players for Round 1 of the next competition, clear picks and previous teams, and mark everyone as unpaid so you can collect money before the new competition starts."))return;
  state.competition++;

@@ -1280,27 +1280,63 @@ body.player-mode .badge.orange{
 }
 
 /* TEST v2 live football */
-.live-football-controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-.live-football-controls button.active{background:#061426!important}
-.live-score-list{display:flex;flex-direction:column;gap:8px}
-.live-score-row{display:grid;grid-template-columns:84px 1fr auto 1fr;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:#fff}
-.live-score-team{font-size:13px;font-weight:950;color:var(--ink)}
+
+.live-football-shell{display:flex;flex-direction:column;gap:14px}
+.live-football-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.live-football-title{display:flex;align-items:center;gap:10px}
+.live-football-title-icon{width:38px;height:38px;border-radius:12px;background:#fff2e8;color:#f97316;display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid #fed7aa}
+.live-football-title h2{margin:0;font-size:22px;color:var(--ink)}
+.live-football-title p{margin:2px 0 0;color:#64748b;font-size:12px}
+.live-football-refresh{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;border:1px solid #fed7aa;background:#fff8f1;color:#9a3412;font-size:11px;font-weight:900;cursor:pointer}
+.live-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;border:1px solid var(--line);border-radius:16px;background:#fff}
+.live-mode-tabs button{border:0;background:#f8fafc;color:#334155;border-radius:12px;padding:11px 12px;font-weight:1000;box-shadow:none}
+.live-mode-tabs button.active{background:linear-gradient(135deg,#ff6a16,#ff4d1f);color:#fff;box-shadow:0 8px 18px rgba(249,115,22,.22)}
+.live-league-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.live-league-tabs button{background:#fff;color:#0f172a;border:1px solid #dbe3ee;border-radius:12px;padding:9px 13px;font-size:12px;font-weight:950;box-shadow:none}
+.live-league-tabs button.active{background:#fff2e8;color:#c2410c;border-color:#fb923c;box-shadow:inset 0 0 0 1px #fb923c}
+.live-football-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.live-panel{border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}
+.live-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;border-bottom:1px solid #edf2f7}
+.live-panel-head strong{color:#ea580c;font-size:14px}
+.live-panel-meta{font-size:10px;color:#64748b;font-weight:900}
+.live-date-group{padding:7px 12px;background:#f8fafc;border-top:1px solid #edf2f7;border-bottom:1px solid #edf2f7;color:#64748b;font-size:10px;font-weight:1000;text-transform:uppercase;letter-spacing:.04em}
+.live-score-list{display:flex;flex-direction:column}
+.live-score-row{display:grid;grid-template-columns:52px minmax(0,1fr) 54px minmax(0,1fr);gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid #edf2f7;background:#fff}
+.live-score-row:last-child{border-bottom:0}
+.live-score-team{font-size:12px;font-weight:950;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live-score-team.away{text-align:right}
-.live-score-value{font-size:18px;font-weight:1000;color:var(--ink);white-space:nowrap}
-.live-score-status{font-size:10px;font-weight:1000;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.live-score-value{font-size:15px;font-weight:1000;color:var(--ink);white-space:nowrap;text-align:center}
+.live-score-value.pre{font-size:12px;color:#64748b}
+.live-score-status{font-size:9px;font-weight:1000;text-transform:uppercase;letter-spacing:.03em;color:#64748b}
 .live-score-status.live{color:#dc2626}
-.live-table-wrap{overflow-x:auto}
-.live-table{width:100%;border-collapse:collapse;min-width:580px}
-.live-table th,.live-table td{padding:8px 7px;border-bottom:1px solid #edf2f7;font-size:12px;text-align:center}
-.live-table th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.live-score-status.ft{color:#ea580c}
+.live-table-wrap{overflow:auto;max-height:560px}
+.live-table{width:100%;border-collapse:collapse;min-width:500px}
+.live-table th,.live-table td{padding:8px 6px;border-bottom:1px solid #edf2f7;font-size:11px;text-align:center}
+.live-table th{position:sticky;top:0;background:#f8fafc;z-index:1;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
 .live-table th:nth-child(2),.live-table td:nth-child(2){text-align:left}
 .live-table td:nth-child(2){font-weight:950;color:var(--ink)}
-.live-football-note{font-size:11px;color:#64748b;line-height:1.4;margin-top:10px}
+.live-table td:first-child{font-weight:1000}
+.live-football-note{font-size:10px;color:#64748b;line-height:1.45;padding:10px 2px 0}
+.live-mobile-hidden{display:block}
+
+@media(max-width:900px){
+ .live-football-grid{grid-template-columns:1fr}
+ .live-mobile-hidden{display:none}
+ .live-mode-tabs{grid-template-columns:1fr 1fr}
+ .live-panel{border-radius:15px}
+ .live-table-wrap{max-height:none}
+}
 @media(max-width:560px){
- .live-score-row{grid-template-columns:56px minmax(0,1fr) auto minmax(0,1fr);gap:6px;padding:9px 8px}
+ .live-football-toolbar{align-items:flex-start}
+ .live-football-title h2{font-size:19px}
+ .live-football-refresh{width:100%;justify-content:center}
+ .live-league-tabs{display:grid;grid-template-columns:1fr 1fr}
+ .live-league-tabs button{padding:9px 8px;font-size:11px}
+ .live-score-row{grid-template-columns:46px minmax(0,1fr) 36px minmax(0,1fr);gap:5px;padding:9px 8px}
  .live-score-team{font-size:11px}
- .live-score-value{font-size:16px}
- .live-score-status{font-size:9px}
+ .live-score-value{font-size:14px}
+ .live-score-status{font-size:8px}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2127,7 +2163,7 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["liveFootball","📡 Live Football"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","📡 Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","⚽ Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  document.body.classList.toggle("player-mode",role==="player");
  document.body.classList.toggle("admin-mode",role==="admin");
@@ -2142,7 +2178,7 @@ function render(){
  const items=navItems();
  const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";
  document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;
- document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰📊]/g,"").trim();
+ document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰📊📡]/g,"").trim();
  document.getElementById("pageSub").textContent="";
  document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;
  document.getElementById("sideSub").textContent="";
@@ -2169,7 +2205,7 @@ function setPage(p){
  }else if(p==="settings"&&authUser&&authUser.role==="admin"){
   loadAdminPollData(true);
  }else if(p==="liveFootball"){
-  loadLiveFootball(true);
+  loadLiveFootballAll(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
   Promise.resolve()
    .then(()=>loadAppSettingsFromSupabase())
@@ -3128,6 +3164,8 @@ function footballStatusLabel(match){
  return status||"—";
 }
 function footballScore(match){
+ const status=String(match?.status||"").toUpperCase();
+ if(status==="SCHEDULED")return "v";
  const score=match?.score||{};
  const full=score.fullTime||{};
  const half=score.halfTime||{};
@@ -3136,6 +3174,22 @@ function footballScore(match){
  if(home==null||away==null)return "v";
  return `${home} - ${away}`;
 }
+function footballDateLabel(utcDate){
+ if(!utcDate)return "Fixtures";
+ const d=new Date(utcDate);
+ if(Number.isNaN(d.getTime()))return "Fixtures";
+ return d.toLocaleDateString([], {weekday:"long",day:"numeric",month:"long"});
+}
+function groupFootballMatches(matches){
+ const groups=[];
+ const map=new Map();
+ (matches||[]).forEach(match=>{
+  const label=footballDateLabel(match?.utcDate);
+  if(!map.has(label)){map.set(label,[]);groups.push([label,map.get(label)]);}
+  map.get(label).push(match);
+ });
+ return groups;
+}
 function liveFootball(){
  const scores=Array.isArray(liveFootballScores?.matches)?liveFootballScores.matches:[];
  const standingPayload=liveFootballStandings[liveFootballCompetition];
@@ -3143,46 +3197,74 @@ function liveFootball(){
   ?standingPayload.standings.find(s=>String(s.type||"").toUpperCase()==="TOTAL")||standingPayload.standings[0]
   :null;
  const table=Array.isArray(totalStanding?.table)?totalStanding.table:[];
- return `<div class="card"><div class="card-head"><strong>Live Football</strong><span class="badge orange">${footballCompetitionName(liveFootballCompetition)}</span></div><div class="card-body">
-  <div class="live-football-controls">
-   <button class="${liveFootballCompetition==="PL"?"active":"secondary"}" onclick="setLiveFootballCompetition('PL')">Premier League</button>
-   <button class="${liveFootballCompetition==="ELC"?"active":"secondary"}" onclick="setLiveFootballCompetition('ELC')">Championship</button>
-   <button class="${liveFootballCompetition==="EL1"?"active":"secondary"}" onclick="setLiveFootballCompetition('EL1')">League One</button>
-   <button class="${liveFootballCompetition==="EL2"?"active":"secondary"}" onclick="setLiveFootballCompetition('EL2')">League Two</button>
-   <button class="${liveFootballTab==="scores"?"active":"secondary"}" onclick="setLiveFootballTab('scores')">Scores</button>
-   <button class="${liveFootballTab==="table"?"active":"secondary"}" onclick="setLiveFootballTab('table')">Table</button>
-   <button class="ghost" onclick="loadLiveFootball(true)">Refresh</button>
+ const leagueName=footballCompetitionName(liveFootballCompetition);
+ const grouped=groupFootballMatches(scores);
+
+ const scoresPanel=`<section class="live-panel ${liveFootballTab==="table"?"live-mobile-hidden":""}">
+  <div class="live-panel-head"><strong>${escapeHtml(leagueName)} Scores</strong><span class="live-panel-meta">2 min refresh</span></div>
+  ${grouped.length?grouped.map(([dateLabel,matches])=>`
+   <div class="live-date-group">${escapeHtml(dateLabel)}</div>
+   <div class="live-score-list">${matches.map(m=>{
+    const status=footballStatusLabel(m);
+    const statusClass=["LIVE","HT"].includes(status)?"live":status==="FT"?"ft":"";
+    const pre=String(m?.status||"").toUpperCase()==="SCHEDULED";
+    return `<div class="live-score-row">
+     <div class="live-score-status ${statusClass}">${escapeHtml(status)}</div>
+     <div class="live-score-team">${escapeHtml(m.homeTeam?.shortName||m.homeTeam?.name||"Home")}</div>
+     <div class="live-score-value ${pre?"pre":""}">${escapeHtml(footballScore(m))}</div>
+     <div class="live-score-team away">${escapeHtml(m.awayTeam?.shortName||m.awayTeam?.name||"Away")}</div>
+    </div>`;
+   }).join("")}</div>`).join(""):`<div class="notice" style="margin:12px">No fixtures returned for this competition.</div>`}
+ </section>`;
+
+ const tablePanel=`<section class="live-panel ${liveFootballTab==="scores"?"live-mobile-hidden":""}">
+  <div class="live-panel-head"><strong>${escapeHtml(leagueName)} Table</strong><span class="live-panel-meta">10 min refresh</span></div>
+  ${table.length?`<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${table.map(r=>`<tr><td>${r.position??""}</td><td>${escapeHtml(r.team?.shortName||r.team?.name||"")}</td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td><strong>${r.points??""}</strong></td></tr>`).join("")}</tbody></table></div>`:`<div class="notice" style="margin:12px">League table is loading or unavailable.</div>`}
+ </section>`;
+
+ return `<div class="live-football-shell">
+  <div class="live-football-toolbar">
+   <div class="live-football-title"><div class="live-football-title-icon">⚽</div><div><h2>Live Football</h2><p>Scores and league tables from across England</p></div></div>
+   <button class="live-football-refresh" onclick="loadLiveFootballAll(true)">↻ Refresh football data</button>
   </div>
+
+  <div class="live-mode-tabs">
+   <button class="${liveFootballTab==="scores"?"active":""}" onclick="setLiveFootballTab('scores')">Scores</button>
+   <button class="${liveFootballTab==="table"?"active":""}" onclick="setLiveFootballTab('table')">Table</button>
+  </div>
+
+  <div class="live-league-tabs">
+   <button class="${liveFootballCompetition==="PL"?"active":""}" onclick="setLiveFootballCompetition('PL')">Premier League</button>
+   <button class="${liveFootballCompetition==="ELC"?"active":""}" onclick="setLiveFootballCompetition('ELC')">Championship</button>
+   <button class="${liveFootballCompetition==="EL1"?"active":""}" onclick="setLiveFootballCompetition('EL1')">League One</button>
+   <button class="${liveFootballCompetition==="EL2"?"active":""}" onclick="setLiveFootballCompetition('EL2')">League Two</button>
+  </div>
+
   ${liveFootballLoading?`<div class="notice">Updating football data...</div>`:
-    liveFootballError?`<div class="notice"><strong>Live Football is not configured yet.</strong><br>${escapeHtml(liveFootballError)}</div>`:
-    liveFootballTab==="scores"
-      ?`${scores.length?`<div class="live-score-list">${scores.map(m=>{
-         const status=footballStatusLabel(m);
-         const live=["LIVE","HT"].includes(status);
-         return `<div class="live-score-row">
-          <div class="live-score-status ${live?"live":""}">${escapeHtml(status)}</div>
-          <div class="live-score-team">${escapeHtml(m.homeTeam?.shortName||m.homeTeam?.name||"Home")}</div>
-          <div class="live-score-value">${escapeHtml(footballScore(m))}</div>
-          <div class="live-score-team away">${escapeHtml(m.awayTeam?.shortName||m.awayTeam?.name||"Away")}</div>
-         </div>`;
-        }).join("")}</div>`:`<div class="notice">No matches returned for this competition today.</div>`}
-        <div class="live-football-note">Scores are information only. Admin result processing remains the authority for LMS eliminations.</div>`
-      :`${table.length?`<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${table.map(r=>`<tr><td>${r.position??""}</td><td>${escapeHtml(r.team?.shortName||r.team?.name||"")}</td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td><strong>${r.points??""}</strong></td></tr>`).join("")}</tbody></table></div>`:`<div class="notice">No league table returned yet.</div>`}
-        <div class="live-football-note">Football data is cached for 2 minutes. LMS eliminations still require the admin to process results.</div>`}
- </div></div>`;
+    liveFootballError?`<div class="notice"><strong>Live Football could not update.</strong><br>${escapeHtml(liveFootballError)}</div>`:
+    `<div class="live-football-grid">${scoresPanel}${tablePanel}</div>`}
+
+  <div class="live-football-note">Scores update every 2 minutes. Tables update every 10 minutes. Football data is for information only; LMS results are still processed manually by the administrator.</div>
+ </div>`;
 }
-async function loadLiveFootball(forceRender=false){
+
+async function loadLiveFootballAction(action){
+ const {data,error}=await supabaseClient.functions.invoke("football-data",{body:{action,competition:liveFootballCompetition}});
+ if(error)throw error;
+ if(!data||data.success===false)throw new Error(data?.error||"Football-data service is not configured.");
+ if(action==="scores")liveFootballScores=data.data;
+ else liveFootballStandings[liveFootballCompetition]=data.data;
+}
+async function loadLiveFootballAll(forceRender=false){
  if(liveFootballLoading)return;
  liveFootballLoading=true;
  liveFootballError="";
  if(forceRender)render();
  try{
-  const action=liveFootballTab==="table"?"standings":"scores";
-  const {data,error}=await supabaseClient.functions.invoke("football-data",{body:{action,competition:liveFootballCompetition}});
-  if(error)throw error;
-  if(!data||data.success===false)throw new Error(data?.error||"Football-data service is not configured.");
-  if(action==="scores")liveFootballScores=data.data;
-  else liveFootballStandings[liveFootballCompetition]=data.data;
+  await Promise.all([
+   loadLiveFootballAction("scores"),
+   loadLiveFootballAction("standings")
+  ]);
  }catch(e){
   console.error("Live Football load failed",e);
   liveFootballError=e.message||"Could not load football data.";
@@ -3191,16 +3273,20 @@ async function loadLiveFootball(forceRender=false){
   if(forceRender||page==="liveFootball")render();
  }
 }
+async function loadLiveFootball(forceRender=false){
+ return loadLiveFootballAll(forceRender);
+}
+
 function setLiveFootballTab(tab){
  liveFootballTab=tab==="table"?"table":"scores";
  render();
- loadLiveFootball(true);
 }
 function setLiveFootballCompetition(code){
  liveFootballCompetition=["PL","ELC","EL1","EL2"].includes(code)?code:"PL";
  liveFootballScores=null;
+ liveFootballStandings[liveFootballCompetition]=null;
  render();
- loadLiveFootball(true);
+ loadLiveFootballAll(true);
 }
 
 function statistics(){
@@ -5402,6 +5488,7 @@ window.closeActivePoll=closeActivePoll;
 window.loadAdminPollData=loadAdminPollData;
 window.saveAutomaticNotificationSettings=saveAutomaticNotificationSettings;
 window.loadLiveFootball=loadLiveFootball;
+window.loadLiveFootballAll=loadLiveFootballAll;
 window.setLiveFootballTab=setLiveFootballTab;
 window.setLiveFootballCompetition=setLiveFootballCompetition;
 window.toggleSoundEffects=toggleSoundEffects;

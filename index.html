@@ -2774,11 +2774,17 @@ function round(){
      ${alive().filter(p=>p.result==="waiting_next_round").map(p=>`<div class="item"><div><div class="item-title">${displayNameHtml(p)}</div><div class="tiny">Round 1 buy-back approved</div></div><div class="waiting-next-round">Waiting for Round 2</div></div>`).join("")}
    </div>
  </div>
- <div class="actions">
-  <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
-  <button class="secondary" onclick="startNextRound()" ${roundTransitionBusy?"disabled":""}>${roundTransitionBusy?"Saving Round…":"Start Next Round"}</button>
-  <button class="secondary" onclick="startNextCompetition()">Start New Competition</button>
- </div>`;
+ ${(()=>{
+   const livePlayers=alive();
+   const winnerReady=livePlayers.length===1 &&
+     !livePlayers.some(p=>p.result==="win"||p.result==="lose"||(p.pick&&p.result==="pending"));
+   return `<div class="actions">
+    <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
+    <button class="secondary" onclick="startNextRound()" ${roundTransitionBusy?"disabled":""}>${roundTransitionBusy?"Saving…":winnerReady?"🏆 Confirm Winner":"Start Next Round"}</button>
+    <button class="secondary" onclick="startNextCompetition()" ${competitionTransitionBusy?"disabled":""}>${competitionTransitionBusy?"Starting Competition…":"Start New Competition"}</button>
+   </div>
+   ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner to add them to the Hall of Fame and complete this competition.</div>`:""}`;
+  })()}`;
 }
 
 
@@ -4798,28 +4804,71 @@ async function startNextRound(){
  }
 }
 
+let competitionTransitionBusy=false;
+
 async function startNextCompetition(){
- if(!confirm("Start Competition #"+(state.competition+1)+"?\n\nThis will reset approved players for Round 1 of the next competition, clear picks and previous teams, and mark everyone as unpaid so you can collect money before the new competition starts."))return;
- state.competition++;
- state.rollover=0;
- state.potCarryover=0;
- state.round=1;
- state.players.filter(p=>p.approved).forEach(p=>{
-  p.alive=true;
-  p.paid=false;
-  p.pick="";
-  p.locked=false;
-  p.result="pending";
-  p.adminOverrideActive=false;
-  p.previous=[];
-  p.outRound=null;
-  p.outPick=null;
- });
- addActivity("round","Competition #"+state.competition+" started","All approved players reset and payment is due");
- page="round";
- toast("Competition #"+state.competition+" started. Collect payments before Round 1.");
- await saveNow();
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(competitionTransitionBusy)return toast("Competition change is already being saved. Please wait.");
+
+ const remaining=alive();
+ const hallHasCurrentWinner=(state.champions||[]).some(c=>
+  Number(c.comp)===Number(state.competition) &&
+  Number(c.rollover||0)===Number(state.rollover||0)
+ );
+ if(remaining.length===1&&!hallHasCurrentWinner){
+  return toast("Confirm the winner first. Use the 🏆 Confirm Winner button before starting a new competition.");
+ }
+
+ const target=Number(state.competition||1)+1;
+ if(!confirm(`Start Competition #${target}?\n\nThis will reset every approved player to Round 1, clear picks and used-team history, clear buy-back state, and mark everyone unpaid.`))return;
+
+ competitionTransitionBusy=true;
+ render();
+
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_start_new_competition_atomic",{
+   p_admin_user_id:authUser.user_id
+  });
+  if(error)throw error;
+
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"The new competition was not started.");
+
+  // Pull the committed database state only after the full transaction succeeded.
+  await loadAppSettingsFromSupabase();
+  await syncUsersFromSupabase();
+  await loadBuyBackData(false);
+
+  state.potCarryover=0;
+  state.manualPotAdjustment=0;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+
+  addActivity(
+   "round",
+   `Competition #${state.competition} started`,
+   "All approved players reset and payment is due"
+  );
+  try{await dbSaveActivityLog();}catch(e){console.warn("Competition start activity log save failed",e);}
+
+  page="round";
+  toast(`Competition #${state.competition} started. All players are reset and unpaid.`);
+  render();
+ }catch(e){
+  console.error("Atomic Start New Competition failed",e);
+  try{
+   await loadAppSettingsFromSupabase();
+   await syncUsersFromSupabase();
+  }catch(syncErr){
+   console.warn("Could not reload after failed competition transition",syncErr);
+  }
+  toast("Competition was NOT changed: "+(e.message||"unknown database error"));
+  render();
+ }finally{
+  competitionTransitionBusy=false;
+  render();
+ }
 }
+
 async function factoryResetKeepAdmin(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  const pass=prompt("Enter admin password to confirm Factory Reset:");

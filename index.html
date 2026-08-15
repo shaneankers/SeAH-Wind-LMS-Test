@@ -2776,14 +2776,19 @@ function round(){
  </div>
  ${(()=>{
    const livePlayers=alive();
+   const championConfirmed=(state.champions||[]).some(c=>
+    Number(c.comp)===Number(state.competition) &&
+    Number(c.rollover||0)===Number(state.rollover||0)
+   );
    const winnerReady=livePlayers.length===1 &&
+     !championConfirmed &&
      !livePlayers.some(p=>p.result==="win"||p.result==="lose"||(p.pick&&p.result==="pending"));
    return `<div class="actions">
     <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
-    <button class="secondary" onclick="startNextRound()" ${roundTransitionBusy?"disabled":""}>${roundTransitionBusy?"Saving…":winnerReady?"🏆 Confirm Winner":"Start Next Round"}</button>
+    <button class="secondary" onclick="startNextRound()" ${(roundTransitionBusy||championConfirmed)?"disabled":""}>${roundTransitionBusy?"Saving…":championConfirmed?"🏆 Winner Confirmed":winnerReady?"🏆 Confirm Winner":"Start Next Round"}</button>
     <button class="secondary" onclick="startNextCompetition()" ${competitionTransitionBusy?"disabled":""}>${competitionTransitionBusy?"Starting Competition…":"Start New Competition"}</button>
    </div>
-   ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner to add them to the Hall of Fame and complete this competition.</div>`:""}`;
+   ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner once to add them to the Hall of Fame and complete this competition.</div>`:championConfirmed?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>Winner confirmed.</strong> This competition is complete.</div>`:""}`;
   })()}`;
 }
 
@@ -4695,6 +4700,11 @@ let roundTransitionBusy=false;
 async function startNextRound(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  if(roundTransitionBusy)return toast("Round change is already being saved. Please wait.");
+ const alreadyConfirmed=(state.champions||[]).some(c=>
+  Number(c.comp)===Number(state.competition) &&
+  Number(c.rollover||0)===Number(state.rollover||0)
+ );
+ if(alreadyConfirmed&&alive().length===1)return toast("This winner has already been confirmed.");
 
  if(alive().some(p=>p.result==="win"||p.result==="lose")){
   return toast("Process the inputted 🟩/🟥 results first.");

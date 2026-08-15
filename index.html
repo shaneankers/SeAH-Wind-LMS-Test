@@ -2776,7 +2776,7 @@ function round(){
  </div>
  <div class="actions">
   <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
-  <button class="secondary" onclick="startNextRound()">Start Next Round</button>
+  <button class="secondary" onclick="startNextRound()" ${roundTransitionBusy?"disabled":""}>${roundTransitionBusy?"Saving Round…":"Start Next Round"}</button>
   <button class="secondary" onclick="startNextCompetition()">Start New Competition</button>
  </div>`;
 }
@@ -3090,6 +3090,10 @@ async function loadBuyBackData(forceRender=false){
 }
 async function requestBuyBack(){
  const p=currentPlayer();
+ const existingStatus=String(currentBuyBackRequest?.status||"").toLowerCase();
+ if(existingStatus==="declined")return toast("Your Round 1 buy-back request was declined. You cannot submit another request.");
+ if(existingStatus==="pending")return toast("Your buy-back request is already pending.");
+ if(existingStatus==="approved")return toast("Your buy-back has already been approved.");
  if(!buyBackEligible(p)){
   return toast(Number(state.round)===2&&!round2BuyBackWindowOpen()
    ?"The Round 2 pick deadline has passed, so the Round 1 buy-back window is closed."
@@ -3141,13 +3145,14 @@ async function declineBuyBack(requestId){
  }catch(e){console.error(e);toast(e.message||"Could not decline request.");}
 }
 function buyBackPlayerCard(p){
+ const status=String(currentBuyBackRequest?.status||"").toLowerCase();
  if(p&&p.buyBackUsed===true&&p.result==="waiting_next_round"){
   return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge green">Approved ✓</span></div><div class="card-body"><div class="notice"><strong>You are back in the competition.</strong><br>Your buy-back has been approved. You will be able to submit your next pick when Round 2 starts.</div></div></div>`;
  }
+ if(status==="declined")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice"><strong>Your buy-back request was declined.</strong><br>You cannot submit another buy-back request for this competition. Contact the administrator only if you believe this was a mistake.</div></div></div>`;
+ if(status==="approved")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge green">Approved ✓</span></div><div class="card-body"><div class="notice">Your Round 1 buy-back has been approved.</div></div></div>`;
  if(!buyBackEligible(p))return "";
- const status=String(currentBuyBackRequest?.status||"");
  if(status==="pending")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Buy-back requested.</strong><br>Please pay the administrator £${state.entryFee}. Approval must be completed before the Round 2 pick deadline.</div></div></div>`;
- if(status==="declined")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice">Your buy-back request was declined. Contact the administrator if you believe this is incorrect.</div></div></div>`;
  return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You can still buy back into the competition while Round 2 is open.<br><strong>${escapeHtml(buyBackDeadlineText())}</strong><br>Once approved, you can submit your Round 2 pick and your Round 1 team remains unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
 }
 function adminBuyBackPanel(){
@@ -4679,56 +4684,117 @@ async function processInputtedResults(){
  }
 }
 
+let roundTransitionBusy=false;
+
 async function startNextRound(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- if(alive().some(p=>p.result==="win"||p.result==="lose"))return toast("Process the inputted 🟩/🟥 results first.");
- const waitingResults=alive().filter(p=>p.result!=="waiting_next_round"&&p.result!=="processed_win"&&p.pick&&p.result==="pending");
- if(waitingResults.length)return toast("Results are still pending for: "+[...new Set(waitingResults.map(p=>p.pick).filter(Boolean))].join(", "));
- if(!confirm(`Finish Round ${state.round} and start the next round? Players with no pick will be eliminated.`))return;
+ if(roundTransitionBusy)return toast("Round change is already being saved. Please wait.");
+
+ if(alive().some(p=>p.result==="win"||p.result==="lose")){
+  return toast("Process the inputted 🟩/🟥 results first.");
+ }
+
+ const waitingResults=alive().filter(
+  p=>p.result!=="waiting_next_round"&&
+     p.result!=="processed_win"&&
+     p.pick&&
+     p.result==="pending"
+ );
+ if(waitingResults.length){
+  return toast("Results are still pending for: "+[...new Set(waitingResults.map(p=>p.pick).filter(Boolean))].join(", "));
+ }
 
  const oldRound=Number(state.round)||1;
- const missed=alive().filter(p=>p.result!=="waiting_next_round"&&!p.pick);
- missed.forEach(p=>{p.alive=false;p.outRound=oldRound;p.outPick="No Pick";p.result="lose";p.locked=true;});
- const readyBuyBacks=alive().filter(p=>p.result==="waiting_next_round");
- const survivors=alive();
+ const missedBefore=alive().filter(p=>p.result!=="waiting_next_round"&&!String(p.pick||"").trim());
+ const buyBackReadyBefore=alive().filter(p=>p.result==="waiting_next_round");
+
+ if(!confirm(`Finish Round ${oldRound} and start the next round? Players with no pick will be eliminated.`))return;
+
+ roundTransitionBusy=true;
+ render();
 
  try{
-  if(survivors.length===0){
-   state.potCarryover=(state.potCarryover||0)+(paid().length*state.entryFee);
-   state.rollover=(state.rollover||0)+1;state.round=oldRound+1;
-   state.players.filter(p=>p.approved&&!isQueuedForNextCompetition(p)).forEach(p=>{p.alive=true;p.paid=false;p.outRound=null;p.outPick=null;p.pick="";p.locked=false;p.result="pending";});
-   addActivity("round","Rollover "+state.rollover+" started","Everyone is back in and payment is due again");
-   addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Collect payment again from everyone who is back in.");
-   await saveNow();
-   for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated","You missed the Round "+oldRound+" pick deadline and have been eliminated.","missed_deadline");
-   toast("Rollover "+state.rollover+" started.");render();return;
+  const {data,error}=await supabaseClient.rpc("admin_start_next_round_atomic",{
+   p_admin_user_id:authUser.user_id
+  });
+  if(error)throw error;
+
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"The next round was not started.");
+
+  // Nothing is mutated locally until the database transaction has succeeded.
+  // Pull the committed truth back from Supabase afterwards.
+  await loadAppSettingsFromSupabase();
+  await syncUsersFromSupabase();
+  await loadBuyBackData(false);
+  await loadTeamStatistics(false);
+
+  localStorage.setItem(storeKey,JSON.stringify(state));
+
+  const action=String(result.action||"next_round");
+  const newRound=Number(result.new_round||state.round||oldRound);
+
+  if(action==="winner"){
+   const winnerId=String(result.winner_user_id||"");
+   const winner=state.players.find(p=>String(p.id)===winnerId);
+   if(winner){
+    await sendAutomaticPlayerPush(
+     winner,
+     "🏆 WINNER!",
+     `Congratulations! You have won SeAH Wind LMS Competition #${state.competition}.`,
+     "winner"
+    );
+   }
+   toast(winner?`Winner: ${winner.name}`:"Competition winner confirmed.");
+   page="playerHall";
+  }else if(action==="rollover"){
+   toast(`Rollover ${state.rollover} started.`);
+  }else{
+   toast(`Round ${newRound} started.`);
   }
 
-  if(survivors.length===1){
-   const winner=survivors[0];
-   winner.wins=Number(winner.wins||0)+1;
-   const champRecord={id:winner.id,name:winner.name,comp:state.competition,rollover:state.rollover||0};
-   if(!(state.champions||[]).some(c=>(c.id===champRecord.id||c.name===champRecord.name)&&Number(c.comp)===Number(champRecord.comp)&&Number(c.rollover||0)===Number(champRecord.rollover||0)))state.champions.push(champRecord);
-   await saveChampionRecord(champRecord);
-   addActivity("round","Winner found: "+winner.name,"Competition #"+state.competition);
-   addAdminAlert("Winner found","Winner: "+winner.name+". Sort the prize money, then start the next competition when ready.");
-   await saveNow();
-   await sendAutomaticPlayerPush(winner,"🏆 WINNER!",`Congratulations! You have won SeAH Wind LMS Competition #${state.competition}.`,"winner");
-   for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated",oldRound===1?`You missed the Round 1 deadline and have been eliminated. A £${state.entryFee} buy-back may be available in the app.`:`You missed the Round ${oldRound} deadline and have been eliminated.`,oldRound===1?"round1_eliminated":"missed_deadline");
-   toast("Winner: "+winner.name);page="playerHall";render();return;
+  // Notifications happen AFTER the successful transaction; notification failure
+  // cannot roll back or corrupt the round state.
+  for(const oldP of missedBefore){
+   const current=state.players.find(p=>p.id===oldP.id)||oldP;
+   await sendAutomaticPlayerPush(
+    current,
+    "❌ Eliminated",
+    oldRound===1
+     ?`You missed the Round 1 deadline and have been eliminated. A £${state.entryFee} buy-back is available in the app.`
+     :`You missed the Round ${oldRound} deadline and have been eliminated.`,
+    oldRound===1?"round1_eliminated":"missed_deadline"
+   );
   }
 
-  state.round=oldRound+1;
-  survivors.forEach(p=>{p.pick="";p.locked=false;p.result="pending";});
-  addActivity("round","Round "+oldRound+" completed","Round "+state.round+" started");
-  await saveNow();
-  for(const p of missed)await sendAutomaticPlayerPush(p,"❌ Eliminated",oldRound===1?`You missed the Round 1 deadline and have been eliminated. A £${state.entryFee} buy-back is available in the app.`:`You missed the Round ${oldRound} deadline and have been eliminated.`,oldRound===1?"round1_eliminated":"missed_deadline");
-  for(const p of readyBuyBacks)await sendAutomaticPlayerPush(p,"🔄 Buy-Back Active",`Round ${state.round} has started. Your buy-back is active and you can now submit your pick.`,"buyback_round_ready");
-  toast("Round "+state.round+" started.");render();
+  if(action==="next_round"){
+   for(const oldP of buyBackReadyBefore){
+    const current=state.players.find(p=>p.id===oldP.id)||oldP;
+    await sendAutomaticPlayerPush(
+     current,
+     "🔄 Buy-Back Active",
+     `Round ${newRound} has started. Your buy-back is active and you can now submit your pick.`,
+     "buyback_round_ready"
+    );
+   }
+  }
+
+  render();
  }catch(e){
-  console.error("Start next round failed",e);
-  toast("Could not start the next round: "+(e.message||"unknown error"));
-  await syncUsersFromSupabase();render();
+  console.error("Atomic Start Next Round failed",e);
+  // Reload server truth. Because the RPC is transactional there should be no
+  // half-cleared player rows to recover from.
+  try{
+   await loadAppSettingsFromSupabase();
+   await syncUsersFromSupabase();
+  }catch(syncErr){
+   console.warn("Could not reload state after failed round transition",syncErr);
+  }
+  toast("Round was NOT changed: "+(e.message||"unknown database error"));
+  render();
+ }finally{
+  roundTransitionBusy=false;
+  render();
  }
 }
 
@@ -5366,11 +5432,9 @@ async function saveNow(){
     }
 
     // Admin round/competition changes also need to reach app_settings so all devices sync.
-    try{
-     await dbSaveSettings();
-    }catch(settingsErr){
-     console.warn("Settings save skipped/failed during saveNow",settingsErr);
-    }
+    // Critical admin actions must not pretend to succeed if competition/settings state
+    // failed to reach Supabase. Let the caller handle the error instead.
+    await dbSaveSettings();
     await dbSaveActivityLog();
    }else{
     // Player actions save that player's state AND append their latest-news entry.

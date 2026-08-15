@@ -1265,6 +1265,43 @@ body.player-mode .badge.orange{
 .test-env-badge{display:inline-flex;align-items:center;margin-left:10px;padding:6px 10px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:1000;letter-spacing:.07em;text-transform:uppercase;box-shadow:0 8px 20px rgba(220,38,38,.28)}
 .processed-result{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;border-radius:12px;background:#dcfce7;color:#166534;font-size:13px;font-weight:1000;border:1px solid #bbf7d0}
 .waiting-next-round{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;border-radius:12px;background:#fef3c7;color:#92400e;font-size:13px;font-weight:1000;border:1px solid #fde68a}
+
+/* TEST v2 compact automatic notification settings */
+.auto-note-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.auto-note-row{display:grid;grid-template-columns:155px minmax(0,1fr) 54px;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid #edf2f7;background:#fff}
+.auto-note-row:last-child{border-bottom:0}
+.auto-note-name{font-size:12px;font-weight:950;color:var(--ink);line-height:1.2}
+.auto-note-row input[type="text"]{padding:8px 10px;border-radius:10px;font-size:12px;min-width:0}
+.auto-note-toggle{display:flex;justify-content:center;align-items:center}
+.auto-note-toggle input{width:18px;height:18px;margin:0;accent-color:#f97316}
+@media(max-width:700px){
+ .auto-note-row{grid-template-columns:110px minmax(0,1fr) 40px;gap:7px;padding:7px}
+ .auto-note-name,.auto-note-row input[type="text"]{font-size:11px}
+}
+
+/* TEST v2 live football */
+.live-football-controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.live-football-controls button.active{background:#061426!important}
+.live-score-list{display:flex;flex-direction:column;gap:8px}
+.live-score-row{display:grid;grid-template-columns:84px 1fr auto 1fr;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.live-score-team{font-size:13px;font-weight:950;color:var(--ink)}
+.live-score-team.away{text-align:right}
+.live-score-value{font-size:18px;font-weight:1000;color:var(--ink);white-space:nowrap}
+.live-score-status{font-size:10px;font-weight:1000;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.live-score-status.live{color:#dc2626}
+.live-table-wrap{overflow-x:auto}
+.live-table{width:100%;border-collapse:collapse;min-width:580px}
+.live-table th,.live-table td{padding:8px 7px;border-bottom:1px solid #edf2f7;font-size:12px;text-align:center}
+.live-table th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.live-table th:nth-child(2),.live-table td:nth-child(2){text-align:left}
+.live-table td:nth-child(2){font-weight:950;color:var(--ink)}
+.live-football-note{font-size:11px;color:#64748b;line-height:1.4;margin-top:10px}
+@media(max-width:560px){
+ .live-score-row{grid-template-columns:56px minmax(0,1fr) auto minmax(0,1fr);gap:6px;padding:9px 8px}
+ .live-score-team{font-size:11px}
+ .live-score-value{font-size:16px}
+ .live-score-status{font-size:9px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1381,6 +1418,13 @@ let activePlayerPoll=null;
 let adminPoll=null;
 let adminPollResults=[];
 let pollLoading=false;
+let liveFootballTab="scores";
+let liveFootballCompetition="PL";
+let liveFootballLoading=false;
+let liveFootballError="";
+let liveFootballScores=null;
+let liveFootballStandings={};
+
 
 function soundEffectsEnabled(){
  const saved=localStorage.getItem(SOUND_EFFECTS_KEY);
@@ -1539,8 +1583,11 @@ function queueForNextCompetition(p){
  return p;
 }
 function ensureLeagues(){
- if(!state.leagues){
-  state.leagues={"Premier League":[...state.teams],"Championship":[],"League One":[],"League Two":[]};
+ if(!state.leagues||typeof state.leagues!=="object"||Object.keys(state.leagues).length===0){
+  state.leagues={"Premier League":[],"Championship":[],"League One":[],"League Two":[]};
+  (state.teams||[]).forEach(team=>{
+   if(team&&!state.leagues["Premier League"].includes(team))state.leagues["Premier League"].push(team);
+  });
  }
  Object.keys(state.leagues).forEach(league=>{
   state.leagues[league]=[...new Set((state.leagues[league]||[]).filter(Boolean))]
@@ -1554,6 +1601,49 @@ function teamLeague(team){
  ensureLeagues();
  return leagueKeys().find(l=>state.leagues[l].includes(team))||leagueKeys()[0];
 }
+function automaticNotificationDefaults(){
+ return {
+  approved:{label:"Account approved",enabled:true,message:"Your account has been approved. You are ready to take part."},
+  approved_paid:{label:"Approved + paid",enabled:true,message:"Your account is approved and your £{entryFee} entry payment has been confirmed."},
+  paid:{label:"Payment received",enabled:true,message:"Your £{entryFee} entry payment has been confirmed."},
+  unpaid_status:{label:"Marked unpaid",enabled:true,message:"Your payment status has been changed to unpaid. Contact the administrator if this is unexpected."},
+  pick_unlocked:{label:"Pick unlocked",enabled:true,message:"Your Round {round} pick has been unlocked. Please submit a new selection before the deadline."},
+  result_win:{label:"Pick won",enabled:true,message:"Your {team} pick won. You remain alive in the competition."},
+  eliminated:{label:"Eliminated",enabled:true,message:"Your {team} pick lost and you have been eliminated from the competition."},
+  round1_eliminated:{label:"Round 1 eliminated",enabled:true,message:"Your Round 1 pick lost. You are eliminated, but a £{entryFee} buy-back is available in the app."},
+  missed_deadline:{label:"Missed deadline",enabled:true,message:"You missed the Round {round} pick deadline and have been eliminated."},
+  restored:{label:"Restored alive",enabled:true,message:"The administrator has restored you as alive in the competition."},
+  buyback_approved:{label:"Buy-back approved",enabled:true,message:"Your £{entryFee} Round 1 buy-back has been approved. You are back in the competition."},
+  buyback_declined:{label:"Buy-back declined",enabled:true,message:"Your Round 1 buy-back request was declined. Contact the administrator if you believe this is incorrect."},
+  buyback_round_ready:{label:"Buy-back active",enabled:true,message:"Round {round} has started. Your buy-back is active and you can now submit your pick."},
+  winner:{label:"Competition winner",enabled:true,message:"Congratulations! You have won SeAH Wind LMS Competition #{competition}."}
+ };
+}
+function ensureAutomaticNotifications(){
+ if(!state.notifications||typeof state.notifications!=="object")state.notifications={};
+ const defaults=automaticNotificationDefaults();
+ if(!state.notifications.auto||typeof state.notifications.auto!=="object")state.notifications.auto={};
+ Object.entries(defaults).forEach(([key,value])=>{
+  const current=state.notifications.auto[key];
+  if(!current||typeof current!=="object")state.notifications.auto[key]={...value};
+  else state.notifications.auto[key]={...value,...current,label:value.label};
+ });
+ return state.notifications.auto;
+}
+function renderAutomaticNotificationMessage(template,player,extra={}){
+ const data={
+  entryFee:state.entryFee,
+  round:extra.round??state.round,
+  competition:state.competition,
+  player:player?.name||"",
+  team:extra.team||player?.pick||player?.outPick||"your team"
+ };
+ return String(template||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
+}
+function autoNotificationSetting(eventType){
+ return ensureAutomaticNotifications()[eventType]||null;
+}
+
 function noteTextRaw(key){
  if(!state.notifications){state.notifications={unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",missingPick:"Pick reminder: you have not selected your team for SeAH Wind LMS Round {round}. Please submit your pick before {deadline}.",winner:"Winner announcement: {winner} has won SeAH Wind LMS Competition #{competition}.",rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."};}
  return state.notifications[key]||"";
@@ -2037,7 +2127,7 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["liveFootball","📡 Live Football"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","📡 Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  document.body.classList.toggle("player-mode",role==="player");
  document.body.classList.toggle("admin-mode",role==="admin");
@@ -2058,7 +2148,7 @@ function render(){
  document.getElementById("sideSub").textContent="";
  document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");
  document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");
- const views={dashboard:dashboard,players:players,round:round,statistics:statistics,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
+ const views={dashboard:dashboard,players:players,round:round,liveFootball:liveFootball,statistics:statistics,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
  const view=views[page]||dashboard;
  const content=document.getElementById("content");
  try{
@@ -2078,6 +2168,8 @@ function setPage(p){
   Promise.resolve().then(()=>loadBuyBackData(false)).then(()=>syncUsersFromSupabase()).then(()=>render()).catch(e=>console.warn("Buy-back page refresh failed",e));
  }else if(p==="settings"&&authUser&&authUser.role==="admin"){
   loadAdminPollData(true);
+ }else if(p==="liveFootball"){
+  loadLiveFootball(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
   Promise.resolve()
    .then(()=>loadAppSettingsFromSupabase())
@@ -2333,11 +2425,16 @@ async function notifyGroup(type,targets,message,templateData={}){
  render();
 }
 
-async function sendAutomaticPlayerPush(player,title,message,eventType="status"){
+async function sendAutomaticPlayerPush(player,title,message,eventType="status",extra={}){
  if(!player||!player.id||player.notifications===false)return false;
+ const setting=autoNotificationSetting(eventType);
+ if(setting&&setting.enabled===false)return false;
+ const finalMessage=setting?.message
+  ?renderAutomaticNotificationMessage(setting.message,player,extra)
+  :renderAutomaticNotificationMessage(message,player,extra);
  try{
   const {data,error}=await supabaseClient.functions.invoke("push-notifications",{
-   body:{type:"direct",event:eventType,target_user_id:player.id,title:String(title||"SeAH Wind LMS"),message:String(message||"")}
+   body:{type:"direct",event:eventType,target_user_id:player.id,title:String(title||"SeAH Wind LMS"),message:finalMessage}
   });
   if(error)throw error;
   if(data&&data.success===false)throw new Error(data.error||data.message||"Push was not sent.");
@@ -3015,6 +3112,97 @@ function statsMiniCard(title,rows,column,emptyMessage){
  </div>`;
 }
 
+function footballCompetitionName(code){
+ return ({PL:"Premier League",ELC:"Championship",EL1:"League One",EL2:"League Two"})[code]||"Premier League";
+}
+function footballStatusLabel(match){
+ const status=String(match?.status||"").toUpperCase();
+ if(status==="IN_PLAY"||status==="LIVE")return "LIVE";
+ if(status==="PAUSED")return "HT";
+ if(status==="FINISHED")return "FT";
+ if(status==="POSTPONED")return "POSTPONED";
+ if(status==="SUSPENDED")return "SUSPENDED";
+ if(status==="CANCELLED")return "CANCELLED";
+ const utc=match?.utcDate?new Date(match.utcDate):null;
+ if(utc&&!Number.isNaN(utc.getTime()))return utc.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+ return status||"—";
+}
+function footballScore(match){
+ const score=match?.score||{};
+ const full=score.fullTime||{};
+ const half=score.halfTime||{};
+ const home=full.home??half.home;
+ const away=full.away??half.away;
+ if(home==null||away==null)return "v";
+ return `${home} - ${away}`;
+}
+function liveFootball(){
+ const scores=Array.isArray(liveFootballScores?.matches)?liveFootballScores.matches:[];
+ const standingPayload=liveFootballStandings[liveFootballCompetition];
+ const totalStanding=Array.isArray(standingPayload?.standings)
+  ?standingPayload.standings.find(s=>String(s.type||"").toUpperCase()==="TOTAL")||standingPayload.standings[0]
+  :null;
+ const table=Array.isArray(totalStanding?.table)?totalStanding.table:[];
+ return `<div class="card"><div class="card-head"><strong>Live Football</strong><span class="badge orange">${footballCompetitionName(liveFootballCompetition)}</span></div><div class="card-body">
+  <div class="live-football-controls">
+   <button class="${liveFootballCompetition==="PL"?"active":"secondary"}" onclick="setLiveFootballCompetition('PL')">Premier League</button>
+   <button class="${liveFootballCompetition==="ELC"?"active":"secondary"}" onclick="setLiveFootballCompetition('ELC')">Championship</button>
+   <button class="${liveFootballCompetition==="EL1"?"active":"secondary"}" onclick="setLiveFootballCompetition('EL1')">League One</button>
+   <button class="${liveFootballCompetition==="EL2"?"active":"secondary"}" onclick="setLiveFootballCompetition('EL2')">League Two</button>
+   <button class="${liveFootballTab==="scores"?"active":"secondary"}" onclick="setLiveFootballTab('scores')">Scores</button>
+   <button class="${liveFootballTab==="table"?"active":"secondary"}" onclick="setLiveFootballTab('table')">Table</button>
+   <button class="ghost" onclick="loadLiveFootball(true)">Refresh</button>
+  </div>
+  ${liveFootballLoading?`<div class="notice">Updating football data...</div>`:
+    liveFootballError?`<div class="notice"><strong>Live Football is not configured yet.</strong><br>${escapeHtml(liveFootballError)}</div>`:
+    liveFootballTab==="scores"
+      ?`${scores.length?`<div class="live-score-list">${scores.map(m=>{
+         const status=footballStatusLabel(m);
+         const live=["LIVE","HT"].includes(status);
+         return `<div class="live-score-row">
+          <div class="live-score-status ${live?"live":""}">${escapeHtml(status)}</div>
+          <div class="live-score-team">${escapeHtml(m.homeTeam?.shortName||m.homeTeam?.name||"Home")}</div>
+          <div class="live-score-value">${escapeHtml(footballScore(m))}</div>
+          <div class="live-score-team away">${escapeHtml(m.awayTeam?.shortName||m.awayTeam?.name||"Away")}</div>
+         </div>`;
+        }).join("")}</div>`:`<div class="notice">No matches returned for this competition today.</div>`}
+        <div class="live-football-note">Scores are information only. Admin result processing remains the authority for LMS eliminations.</div>`
+      :`${table.length?`<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${table.map(r=>`<tr><td>${r.position??""}</td><td>${escapeHtml(r.team?.shortName||r.team?.name||"")}</td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td><strong>${r.points??""}</strong></td></tr>`).join("")}</tbody></table></div>`:`<div class="notice">No league table returned yet.</div>`}
+        <div class="live-football-note">Football data is cached for 2 minutes to keep usage comfortably inside the free allowance. LMS eliminations still require the admin to process results.</div>`}
+ </div></div>`;
+}
+async function loadLiveFootball(forceRender=false){
+ if(liveFootballLoading)return;
+ liveFootballLoading=true;
+ liveFootballError="";
+ if(forceRender)render();
+ try{
+  const action=liveFootballTab==="table"?"standings":"scores";
+  const {data,error}=await supabaseClient.functions.invoke("football-data",{body:{action,competition:liveFootballCompetition}});
+  if(error)throw error;
+  if(!data||data.success===false)throw new Error(data?.error||"Football-data service is not configured.");
+  if(action==="scores")liveFootballScores=data.data;
+  else liveFootballStandings[liveFootballCompetition]=data.data;
+ }catch(e){
+  console.error("Live Football load failed",e);
+  liveFootballError=e.message||"Could not load football data.";
+ }finally{
+  liveFootballLoading=false;
+  if(forceRender||page==="liveFootball")render();
+ }
+}
+function setLiveFootballTab(tab){
+ liveFootballTab=tab==="table"?"table":"scores";
+ render();
+ loadLiveFootball(true);
+}
+function setLiveFootballCompetition(code){
+ liveFootballCompetition=["PL","ELC","EL1","EL2"].includes(code)?code:"PL";
+ liveFootballScores=null;
+ render();
+ loadLiveFootball(true);
+}
+
 function statistics(){
  if(teamStatisticsLoading){
   return `<div class="card"><div class="card-head"><strong>Statistics & Records</strong></div><div class="card-body"><div class="notice">Loading statistics...</div></div></div>`;
@@ -3671,6 +3859,19 @@ function settings(){
   <button onclick="saveAnnouncementAndDisclaimer()">Save Announcement & Disclaimer</button>
  </div></div>
 
+ <div class="card"><div class="card-head"><strong>Automatic Player Notifications</strong><span class="badge orange">Compact</span></div><div class="card-body">
+  <div class="tiny" style="margin-bottom:10px">These trigger automatically after a successful status change. Untick any notification you do not want sent.</div>
+  <div class="auto-note-list">
+   ${Object.entries(ensureAutomaticNotifications()).map(([key,item])=>`<div class="auto-note-row">
+    <div class="auto-note-name">${escapeHtml(item.label)}</div>
+    <input type="text" id="autoNote-${key}" value="${escapeAttr(item.message||"")}" aria-label="${escapeAttr(item.label)} message">
+    <div class="auto-note-toggle"><input type="checkbox" id="autoToggle-${key}" ${item.enabled!==false?"checked":""} aria-label="${escapeAttr(item.label)} enabled"></div>
+   </div>`).join("")}
+  </div>
+  <div class="actions" style="margin-top:12px"><button onclick="saveAutomaticNotificationSettings()">Save Automatic Notifications</button></div>
+  <div class="tiny" style="margin-top:8px">Placeholders: {entryFee}, {round}, {competition}, {player}, {team}</div>
+ </div></div>
+
  <div class="card"><div class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
   <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${escapeHtml(noteTextRaw('unpaid'))}</textarea></div>
   <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${escapeHtml(noteTextRaw('missingPick'))}</textarea></div>
@@ -3695,6 +3896,11 @@ function settings(){
    <button class="ghost" onclick="loadAdminPollData(true)">Refresh Results</button>
   </div>
   <div style="margin-top:18px"><label>Current / latest poll</label>${renderAdminPollResults()}</div>
+ </div></div>
+
+ <div class="card"><div class="card-head"><strong>Live Football</strong><span class="badge orange">TEST</span></div><div class="card-body">
+  <div class="item"><div><div class="item-title">Big Balls Sports Data</div><div class="tiny">Premier League, Championship, League One and League Two scores/tables. The free API key stays in the Supabase Edge Function secret, never in the app.</div></div><button class="small ghost" onclick="setPage('liveFootball')">Open</button></div>
+  <div class="tiny" style="margin-top:10px">Free plan: scores and standings with 1,000 requests/day. The app cache refreshes at most once every 2 minutes per league.</div>
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
@@ -4159,8 +4365,8 @@ async function processInputtedResults(){
   await loadTeamStatistics(false);
   for(const item of snapshot){
    const p=item.player;
-   if(item.result==="win")await sendAutomaticPlayerPush(p,"🟩 YOU'RE THROUGH!",`Your ${item.pick} pick won. You remain alive in the competition.`,"result_win");
-   else await sendAutomaticPlayerPush(p,"❌ Eliminated",Number(state.round)===1?`Your ${item.pick||"Round 1"} pick has lost. You are eliminated, but a £${state.entryFee} Round 1 buy-back is available in the app.`:`Your ${item.pick||"team"} pick has lost and you have been eliminated from the competition.`,Number(state.round)===1?"round1_eliminated":"eliminated");
+   if(item.result==="win")await sendAutomaticPlayerPush(p,"🟩 YOU'RE THROUGH!",`Your ${item.pick} pick won. You remain alive in the competition.`,"result_win",{team:item.pick});
+   else await sendAutomaticPlayerPush(p,"❌ Eliminated",Number(state.round)===1?`Your ${item.pick||"Round 1"} pick has lost. You are eliminated, but a £${state.entryFee} Round 1 buy-back is available in the app.`:`Your ${item.pick||"team"} pick has lost and you have been eliminated from the competition.`,Number(state.round)===1?"round1_eliminated":"eliminated",{team:item.pick});
   }
   toast(`${candidates.length} inputted result${candidates.length===1?"":"s"} processed. Round ${state.round} remains open.`);
   await loadBuyBackData(false);render();
@@ -4425,6 +4631,29 @@ async function savePaymentDetails(){
  }catch(e){
   console.error("Payment details save failed",e);
   toast("Payment details did not save: "+(e.message||"check Supabase"));
+ }
+ render();
+}
+
+async function saveAutomaticNotificationSettings(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const auto=ensureAutomaticNotifications();
+ Object.keys(auto).forEach(key=>{
+  const messageEl=document.getElementById("autoNote-"+key);
+  const toggleEl=document.getElementById("autoToggle-"+key);
+  if(messageEl)auto[key].message=(messageEl.value||"").trim();
+  if(toggleEl)auto[key].enabled=!!toggleEl.checked;
+ });
+ state.notifications.auto=auto;
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ toast("Saving automatic notifications...");
+ try{
+  await dbSaveSettings();
+  await loadAppSettingsFromSupabase();
+  toast("Automatic notification settings saved.");
+ }catch(e){
+  console.error("Automatic notification settings save failed",e);
+  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase"));
  }
  render();
 }
@@ -5171,6 +5400,10 @@ window.closePlayerPollModal=closePlayerPollModal;
 window.publishPoll=publishPoll;
 window.closeActivePoll=closeActivePoll;
 window.loadAdminPollData=loadAdminPollData;
+window.saveAutomaticNotificationSettings=saveAutomaticNotificationSettings;
+window.loadLiveFootball=loadLiveFootball;
+window.setLiveFootballTab=setLiveFootballTab;
+window.setLiveFootballCompetition=setLiveFootballCompetition;
 window.toggleSoundEffects=toggleSoundEffects;
 window.savePlayerAccount=savePlayerAccount;
 window.saveSettings=saveSettings;

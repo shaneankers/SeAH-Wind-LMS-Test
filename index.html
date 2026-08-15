@@ -1390,6 +1390,22 @@ body.player-mode .badge.orange{
  .topbar{align-items:flex-start}
  .header-refresh{padding:8px 10px;font-size:10px}
 }
+
+/* Round 1 buy-back tidy admin list */
+.buyback-admin-list{display:flex;flex-direction:column;gap:7px}
+.buyback-admin-row{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;
+ padding:9px 11px;border:1px solid #e3eaf2;border-radius:12px;background:#fff
+}
+.buyback-admin-main{min-width:0}
+.buyback-admin-name{font-size:12px;font-weight:1000;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.buyback-admin-meta{font-size:10px;color:#64748b;margin-top:2px}
+.buyback-admin-actions{display:flex;gap:6px;align-items:center}
+.buyback-admin-actions button{padding:7px 10px!important;min-width:auto!important;font-size:10px!important;border-radius:9px!important}
+@media(max-width:560px){
+ .buyback-admin-row{grid-template-columns:1fr}
+ .buyback-admin-actions{justify-content:flex-start}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1500,6 +1516,8 @@ let teamStatisticsRows=[];
 let teamStatisticsLoading=false;
 let teamStatisticsError="";
 let buyBackRequests=[];
+let adminBuyBackWatchTimer=null;
+const ADMIN_BUYBACK_SEEN_KEY="seah_test_admin_seen_buyback_requests";
 let currentBuyBackRequest=null;
 let buyBackLoading=false;
 let activePlayerPoll=null;
@@ -2186,7 +2204,8 @@ async function completeForcedPasswordReset(){
  }
 }
 
-function logout(){authUser=null;currentUserId=null;clearStoredAuthUser();page="dashboard";renderAuth()}
+function logout(){
+ stopAdminBuyBackWatch();authUser=null;currentUserId=null;clearStoredAuthUser();page="dashboard";renderAuth()}
 function ensureAdminPlayer(){
  let p=(authUser&&authUser.user_id)?state.players.find(x=>x.id===authUser.user_id):null;
  if(!p) p=state.players.find(x=>x.adminPlayer===true);
@@ -2927,9 +2946,119 @@ async function closeActivePoll(){
  }
 }
 
-function buyBackEligible(p){
- return !!(p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&(Number(state.round)===1||Number(state.round)===2)&&p.buyBackUsed!==true);
+function round2BuyBackWindowOpen(){
+ const round=Number(state.round)||1;
+ if(round===1)return true;
+ if(round!==2)return false;
+ const raw=String(state.deadlineAt||"").trim();
+ if(!raw)return true;
+ const deadline=new Date(raw);
+ if(Number.isNaN(deadline.getTime()))return true;
+ return Date.now()<deadline.getTime();
 }
+function buyBackDeadlineText(){
+ if(Number(state.round)!==2)return "";
+ const raw=String(state.deadlineAt||"").trim();
+ if(!raw)return "Available until the Round 2 pick deadline.";
+ const d=new Date(raw);
+ if(Number.isNaN(d.getTime()))return "Available until the Round 2 pick deadline.";
+ return `Available until ${d.toLocaleString([], {weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}.`;
+}
+function buyBackEligible(p){
+ return !!(
+  p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&
+  (Number(state.round)===1||Number(state.round)===2)&&
+  round2BuyBackWindowOpen()&&
+  p.buyBackUsed!==true
+ );
+}
+function getSeenBuyBackRequestIds(){
+ try{
+  const raw=JSON.parse(localStorage.getItem(ADMIN_BUYBACK_SEEN_KEY)||"[]");
+  return new Set(Array.isArray(raw)?raw.map(String):[]);
+ }catch(e){return new Set();}
+}
+function saveSeenBuyBackRequestIds(ids){
+ try{localStorage.setItem(ADMIN_BUYBACK_SEEN_KEY,JSON.stringify([...ids]));}catch(e){}
+}
+function announceNewAdminBuyBackRequests(requests){
+ if(!authUser||authUser.role!=="admin")return;
+ const pending=(requests||[]).filter(r=>String(r.status)==="pending");
+ if(!pending.length)return;
+
+ const seen=getSeenBuyBackRequestIds();
+ const fresh=pending.filter(r=>!seen.has(String(r.id)));
+ if(!fresh.length)return;
+
+ fresh.forEach(r=>seen.add(String(r.id)));
+ saveSeenBuyBackRequestIds(seen);
+
+ fresh.forEach(r=>{
+  const name=r.display_name||r.username||"A player";
+  const fee=Number(r.fee||state.entryFee);
+  addAdminAlert(
+   "🔄 New Buy-Back Request",
+   `${name} has requested a Round 1 buy-back for £${fee}. Payment confirmation is required before approval.`
+  );
+  addActivity(
+   "round",
+   `${name} requested a buy-back`,
+   `Round 1 buy-back request · £${fee}`
+  );
+ });
+
+ const count=fresh.length;
+ toast(count===1
+  ?`${fresh[0].display_name||fresh[0].username||"A player"} requested a buy-back.`
+  :`${count} new buy-back requests received.`);
+
+ // Browser notification if the admin has already granted permission.
+ try{
+  if("Notification" in window&&Notification.permission==="granted"){
+   new Notification("SeAH Wind LMS — Buy-Back Request",{
+    body:count===1
+     ?`${fresh[0].display_name||fresh[0].username||"A player"} requested a Round 1 buy-back.`
+     :`${count} new Round 1 buy-back requests received.`
+   });
+  }
+ }catch(e){console.warn("Admin browser notification failed",e);}
+
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ // Persist the alert/activity so it is visible on another admin device/session too.
+ Promise.resolve().then(()=>dbSaveSettings()).catch(e=>console.warn("Could not persist buy-back admin alert",e));
+}
+async function checkAdminBuyBackRequests(){
+ if(!authUser||authUser.role!=="admin"||buyBackLoading)return;
+ try{
+  const res=await supabaseClient.rpc("admin_list_buy_back_requests",{p_admin_user_id:authUser.user_id});
+  if(res.error)throw res.error;
+  const rows=Array.isArray(res.data)?res.data:[];
+  announceNewAdminBuyBackRequests(rows);
+  const oldPending=(buyBackRequests||[]).filter(r=>r.status==="pending").map(r=>String(r.id)).sort().join("|");
+  const newPending=rows.filter(r=>r.status==="pending").map(r=>String(r.id)).sort().join("|");
+  buyBackRequests=rows;
+  if(page==="dashboard"&&oldPending!==newPending)render();
+ }catch(e){
+  console.warn("Admin buy-back watch failed",e);
+ }
+}
+function startAdminBuyBackWatch(){
+ if(adminBuyBackWatchTimer){
+  clearInterval(adminBuyBackWatchTimer);
+  adminBuyBackWatchTimer=null;
+ }
+ if(!authUser||authUser.role!=="admin")return;
+ // Check immediately, then every 20 seconds while the app is open.
+ checkAdminBuyBackRequests();
+ adminBuyBackWatchTimer=setInterval(checkAdminBuyBackRequests,20000);
+}
+function stopAdminBuyBackWatch(){
+ if(adminBuyBackWatchTimer){
+  clearInterval(adminBuyBackWatchTimer);
+  adminBuyBackWatchTimer=null;
+ }
+}
+
 async function loadBuyBackData(forceRender=false){
  if(!authUser||!authUser.user_id||buyBackLoading)return;
  buyBackLoading=true;
@@ -2943,6 +3072,7 @@ async function loadBuyBackData(forceRender=false){
    const res=await supabaseClient.rpc("admin_list_buy_back_requests",{p_admin_user_id:authUser.user_id});
    if(res.error)throw res.error;
    buyBackRequests=Array.isArray(res.data)?res.data:[];
+   announceNewAdminBuyBackRequests(buyBackRequests);
    currentBuyBackRequest=null;
   }else{
    const res=await supabaseClient.rpc("get_my_buy_back_request",{p_user_id:authUser.user_id});
@@ -2960,7 +3090,11 @@ async function loadBuyBackData(forceRender=false){
 }
 async function requestBuyBack(){
  const p=currentPlayer();
- if(!buyBackEligible(p))return toast("A Round 1 buy-back is not currently available.");
+ if(!buyBackEligible(p)){
+  return toast(Number(state.round)===2&&!round2BuyBackWindowOpen()
+   ?"The Round 2 pick deadline has passed, so the Round 1 buy-back window is closed."
+   :"A Round 1 buy-back is not currently available.");
+ }
  if(!confirm(`Request a Round 1 buy-back for £${state.entryFee}? You must pay the administrator before it can be approved.`))return;
  try{
   const {data,error}=await supabaseClient.rpc("request_round1_buy_back",{p_user_id:p.id});
@@ -2972,6 +3106,9 @@ async function requestBuyBack(){
  }catch(e){console.error(e);toast(e.message||"Buy-back request failed.");}
 }
 async function approveBuyBack(requestId){
+ if(Number(state.round)===2&&!round2BuyBackWindowOpen()){
+  return toast("The Round 2 pick deadline has passed. This buy-back can no longer be approved.");
+ }
  if(!confirm("Confirm payment has been received and approve this buy-back?"))return;
  const request=(buyBackRequests||[]).find(r=>String(r.id)===String(requestId));
  const player=request?state.players.find(p=>p.id===request.user_id):null;
@@ -3009,14 +3146,23 @@ function buyBackPlayerCard(p){
  }
  if(!buyBackEligible(p))return "";
  const status=String(currentBuyBackRequest?.status||"");
- if(status==="pending")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Buy-back requested.</strong><br>Please pay the administrator £${state.entryFee}. You will be reinstated once payment is confirmed.</div></div></div>`;
+ if(status==="pending")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Buy-back requested.</strong><br>Please pay the administrator £${state.entryFee}. Approval must be completed before the Round 2 pick deadline.</div></div></div>`;
  if(status==="declined")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice">Your buy-back request was declined. Contact the administrator if you believe this is incorrect.</div></div></div>`;
- return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You may request your £${state.entryFee} buy-back now. Once approved, you will return for Round 2 and your Round 1 team will remain unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
+ return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You can still buy back into the competition while Round 2 is open.<br><strong>${escapeHtml(buyBackDeadlineText())}</strong><br>Once approved, you can submit your Round 2 pick and your Round 1 team remains unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
 }
 function adminBuyBackPanel(){
  const pending=(buyBackRequests||[]).filter(r=>r.status==="pending");
  if(!pending.length)return "";
- return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back Requests</strong><span class="badge orange">${pending.length}</span></div><div class="card-body list">${pending.map(r=>`<div class="item"><div><div class="item-title">${escapeHtml(r.display_name||r.username||"Player")}</div><div class="tiny">£${Number(r.fee||state.entryFee)} · Awaiting payment confirmation</div></div><div class="actions"><button class="small" onclick="approveBuyBack('${escapeAttr(r.id)}')">Approve</button><button class="small secondary" onclick="declineBuyBack('${escapeAttr(r.id)}')">Decline</button></div></div>`).join("")}</div></div>`;
+ return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back Requests</strong><span class="badge orange">${pending.length}</span></div><div class="card-body"><div class="buyback-admin-list">${pending.map(r=>`<div class="buyback-admin-row">
+  <div class="buyback-admin-main">
+   <div class="buyback-admin-name">${escapeHtml(r.display_name||r.username||"Player")}</div>
+   <div class="buyback-admin-meta">£${Number(r.fee||state.entryFee)} · Pending payment · ${Number(state.round)===2?escapeHtml(buyBackDeadlineText()):"Round 1"}</div>
+  </div>
+  <div class="buyback-admin-actions">
+   <button onclick="approveBuyBack('${escapeAttr(r.id)}')">Approve</button>
+   <button class="secondary" onclick="declineBuyBack('${escapeAttr(r.id)}')">Decline</button>
+  </div>
+ </div>`).join("")}</div></div></div>`;
 }
 async function saveManualPotAdjustment(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
@@ -4015,7 +4161,7 @@ function settings(){
   <button onclick="saveAnnouncementAndDisclaimer()">Save Announcement & Disclaimer</button>
  </div></div>
 
- <div class="card"><div class="card-head"><strong>Automatic Player Notifications</strong><span class="badge orange">Compact</span></div><div class="card-body">
+ <div class="card"><div class="card-head"><strong>Automatic Player Notifications</strong></div><div class="card-body">
   <div class="tiny" style="margin-bottom:10px">These trigger automatically after a successful status change. Untick any notification you do not want sent.</div>
   <div class="auto-note-list">
    ${Object.entries(ensureAutomaticNotifications()).map(([key,item])=>`<div class="auto-note-row">
@@ -5521,6 +5667,7 @@ async function boot(){
  await loadChampionRecords();
  await loadTeamStatistics(false);
  await loadBuyBackData(false);
+ if(authUser&&authUser.role==="admin")startAdminBuyBackWatch();
  await loadAdminPollData(false);
  await ensurePushRegistered(true);
  render();
@@ -5549,6 +5696,7 @@ window.statistics=statistics;
 window.loadTeamStatistics=loadTeamStatistics;
 window.requestBuyBack=requestBuyBack;
 window.approveBuyBack=approveBuyBack;
+window.checkAdminBuyBackRequests=checkAdminBuyBackRequests;
 window.declineBuyBack=declineBuyBack;
 window.saveManualPotAdjustment=saveManualPotAdjustment;
 window.submitPlayerPollVote=submitPlayerPollVote;

@@ -3168,7 +3168,7 @@ function liveFootball(){
         }).join("")}</div>`:`<div class="notice">No matches returned for this competition today.</div>`}
         <div class="live-football-note">Scores are information only. Admin result processing remains the authority for LMS eliminations.</div>`
       :`${table.length?`<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${table.map(r=>`<tr><td>${r.position??""}</td><td>${escapeHtml(r.team?.shortName||r.team?.name||"")}</td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td><strong>${r.points??""}</strong></td></tr>`).join("")}</tbody></table></div>`:`<div class="notice">No league table returned yet.</div>`}
-        <div class="live-football-note">Football data is cached for 2 minutes to keep usage comfortably inside the free allowance. LMS eliminations still require the admin to process results.</div>`}
+        <div class="live-football-note">Football data is cached for 2 minutes. LMS eliminations still require the admin to process results.</div>`}
  </div></div>`;
 }
 async function loadLiveFootball(forceRender=false){
@@ -3899,8 +3899,8 @@ function settings(){
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Live Football</strong><span class="badge orange">TEST</span></div><div class="card-body">
-  <div class="item"><div><div class="item-title">Big Balls Sports Data</div><div class="tiny">Premier League, Championship, League One and League Two scores/tables. The free API key stays in the Supabase Edge Function secret, never in the app.</div></div><button class="small ghost" onclick="setPage('liveFootball')">Open</button></div>
-  <div class="tiny" style="margin-top:10px">Free plan: scores and standings with 1,000 requests/day. The app cache refreshes at most once every 2 minutes per league.</div>
+  <div class="item"><div><div class="item-title">ESPN Football Data</div><div class="tiny">Premier League, Championship, League One and League Two scores/tables via ESPN football data.</div></div><button class="small ghost" onclick="setPage('liveFootball')">Open</button></div>
+  <div class="tiny" style="margin-top:10px">No API key or paid subscription required. Scores are cached for 2 minutes and tables for 10 minutes.</div>
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">

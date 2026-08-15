@@ -1381,6 +1381,15 @@ body.player-mode .badge.orange{
 }
 .live-table thead th:first-child{border-top-left-radius:0}
 .live-table thead th:last-child{border-top-right-radius:0}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.header-refresh{margin:0;white-space:nowrap}
+.live-points,.live-points strong{color:#f4510c!important;font-weight:1000!important}
+.club-badge{display:block;background:transparent;border-radius:0}
+@media(max-width:700px){
+ .topbar{align-items:flex-start}
+ .header-refresh{padding:8px 10px;font-size:10px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1503,8 +1512,6 @@ let liveFootballLoading=false;
 let liveFootballError="";
 let liveFootballScores=null;
 let liveFootballStandings={};
-let liveFootballLogoMaps={};
-let liveFootballLogoLoading={};
 
 
 function soundEffectsEnabled(){
@@ -2227,6 +2234,12 @@ function render(){
  pageTitleEl.textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰📊📡]/g,"").trim();
  pageTitleEl.classList.toggle("live-football-page-title",page==="liveFootball");
  document.getElementById("pageSub").textContent="";
+ const pageHeaderAction=document.getElementById("pageHeaderAction");
+ if(pageHeaderAction){
+  pageHeaderAction.innerHTML=page==="liveFootball"
+   ?`<button class="live-football-refresh header-refresh" onclick="loadLiveFootballAll(true)">↻ Refresh football data</button>`
+   :"";
+ }
  document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;
  document.getElementById("sideSub").textContent="";
  document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");
@@ -2252,7 +2265,6 @@ function setPage(p){
  }else if(p==="settings"&&authUser&&authUser.role==="admin"){
   loadAdminPollData(true);
  }else if(p==="liveFootball"){
-  loadFootballLogos(liveFootballCompetition);
   loadLiveFootballAll(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
   Promise.resolve()
@@ -3196,54 +3208,14 @@ function statsMiniCard(title,rows,column,emptyMessage){
  </div>`;
 }
 
-function normaliseFootballTeamName(value){
- return String(value||"")
-  .toLowerCase()
-  .replace(/\b(fc|afc|town|city|united|rovers|wanderers|football club)\b/g," ")
-  .replace(/[^a-z0-9]+/g," ")
-  .replace(/\s+/g," ")
-  .trim();
-}
-function footballTeamLogo(name){
- const map=liveFootballLogoMaps[liveFootballCompetition]||{};
- const raw=String(name||"").trim();
- return map[raw]||map[normaliseFootballTeamName(raw)]||"";
-}
-function footballBadgeHtml(name,small=false){
- const logo=footballTeamLogo(name);
+function footballBadgeHtml(team,small=false){
+ const name=typeof team==="string"?team:(team?.shortName||team?.name||"");
+ const logo=typeof team==="object"?(team?.logo||""):"";
  if(logo){
-  return `<img class="club-badge ${small?"small":""}" src="${escapeAttr(logo)}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+  return `<img class="club-badge ${small?"small":""}" src="${escapeAttr(logo)}" alt="${escapeAttr(name)} badge" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=&quot;club-badge-fallback&quot;>${escapeHtml(String(name||"?").slice(0,2).toUpperCase())}</span>'">`;
  }
  const initials=String(name||"?").split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
  return `<span class="club-badge-fallback">${escapeHtml(initials||"?")}</span>`;
-}
-async function loadFootballLogos(competition=liveFootballCompetition){
- if(liveFootballLogoMaps[competition]||liveFootballLogoLoading[competition])return;
- liveFootballLogoLoading[competition]=true;
- try{
-  const league=({PL:"eng.1",ELC:"eng.2",EL1:"eng.3",EL2:"eng.4"})[competition]||"eng.1";
-  const res=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams?limit=100`);
-  if(!res.ok)throw new Error("Team badge lookup failed");
-  const raw=await res.json();
-  const teams=raw?.sports?.[0]?.leagues?.[0]?.teams||[];
-  const map={};
-  teams.forEach(entry=>{
-   const team=entry?.team||entry;
-   const logo=team?.logos?.[0]?.href||team?.logo||"";
-   const names=[team?.displayName,team?.shortDisplayName,team?.name,team?.location,team?.abbreviation].filter(Boolean);
-   names.forEach(n=>{
-    map[String(n)]=logo;
-    map[normaliseFootballTeamName(n)]=logo;
-   });
-  });
-  liveFootballLogoMaps[competition]=map;
- }catch(e){
-  console.warn("Club badge lookup failed",competition,e);
-  liveFootballLogoMaps[competition]={};
- }finally{
-  liveFootballLogoLoading[competition]=false;
-  if(page==="liveFootball"&&competition===liveFootballCompetition)render();
- }
 }
 
 function footballCompetitionName(code){
@@ -3310,9 +3282,9 @@ function liveFootball(){
     const awayName=m.awayTeam?.shortName||m.awayTeam?.name||"Away";
     return `<div class="live-score-row">
      <div class="live-score-status ${statusClass}">${escapeHtml(status)}</div>
-     <div class="live-team-wrap">${footballBadgeHtml(homeName)}<div class="live-score-team">${escapeHtml(homeName)}</div></div>
+     <div class="live-team-wrap">${footballBadgeHtml(m.homeTeam)}<div class="live-score-team">${escapeHtml(homeName)}</div></div>
      <div class="live-score-value ${pre?"pre":""}">${escapeHtml(footballScore(m))}</div>
-     <div class="live-team-wrap away"><div class="live-score-team away">${escapeHtml(awayName)}</div>${footballBadgeHtml(awayName)}</div>
+     <div class="live-team-wrap away"><div class="live-score-team away">${escapeHtml(awayName)}</div>${footballBadgeHtml(m.awayTeam)}</div>
     </div>`;
    }).join("")}</div>`).join(""):`<div class="notice" style="margin:12px">No fixtures returned for this competition.</div>`}
  </section>`;
@@ -3321,15 +3293,11 @@ function liveFootball(){
   <div class="live-panel-head"><strong>${escapeHtml(leagueName)} Table</strong><span class="live-panel-meta">10 min refresh</span></div>
   ${table.length?`<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Pos</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>${table.map(r=>{
    const teamName=r.team?.shortName||r.team?.name||"";
-   return `<tr><td>${r.position??""}</td><td><div class="live-table-team">${footballBadgeHtml(teamName,true)}<span>${escapeHtml(teamName)}</span></div></td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td><strong>${r.points??""}</strong></td></tr>`;
+   return `<tr><td>${r.position??""}</td><td><div class="live-table-team">${footballBadgeHtml(r.team,true)}<span>${escapeHtml(teamName)}</span></div></td><td>${r.playedGames??""}</td><td>${r.won??""}</td><td>${r.draw??""}</td><td>${r.lost??""}</td><td>${r.goalDifference??""}</td><td class="live-points"><strong>${r.points??""}</strong></td></tr>`;
   }).join("")}</tbody></table></div>`:`<div class="notice" style="margin:12px">League table is loading or unavailable.</div>`}
  </section>`;
 
  return `<div class="live-football-shell">
-  <div class="live-football-controls-top">
-   <button class="live-football-refresh" onclick="loadLiveFootballAll(true)">↻ Refresh football data</button>
-  </div>
-
   <div class="live-mode-tabs">
    <button class="${liveFootballTab==="scores"?"active":""}" onclick="setLiveFootballTab('scores')">Scores</button>
    <button class="${liveFootballTab==="table"?"active":""}" onclick="setLiveFootballTab('table')">Table</button>
@@ -3388,7 +3356,6 @@ function setLiveFootballCompetition(code){
  liveFootballScores=null;
  liveFootballStandings[liveFootballCompetition]=null;
  render();
- loadFootballLogos(liveFootballCompetition);
  loadLiveFootballAll(true);
 }
 
@@ -5592,7 +5559,6 @@ window.loadAdminPollData=loadAdminPollData;
 window.saveAutomaticNotificationSettings=saveAutomaticNotificationSettings;
 window.loadLiveFootball=loadLiveFootball;
 window.loadLiveFootballAll=loadLiveFootballAll;
-window.loadFootballLogos=loadFootballLogos;
 window.setLiveFootballTab=setLiveFootballTab;
 window.setLiveFootballCompetition=setLiveFootballCompetition;
 window.toggleSoundEffects=toggleSoundEffects;

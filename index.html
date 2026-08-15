@@ -2556,6 +2556,9 @@ async function sendAutomaticPlayerPush(player,title,message,eventType="status",e
   return true;
  }catch(e){
   console.warn("Automatic player push was not delivered",eventType,player.name,e);
+  if(authUser&&authUser.role==="admin"){
+   toast(`Status saved, but notification to ${player.name||"player"} was not delivered.`);
+  }
   return false;
  }
 }
@@ -2780,15 +2783,24 @@ function round(){
     Number(c.comp)===Number(state.competition) &&
     Number(c.rollover||0)===Number(state.rollover||0)
    );
-   const winnerReady=livePlayers.length===1 &&
-     !championConfirmed &&
-     !livePlayers.some(p=>p.result==="win"||p.result==="lose"||(p.pick&&p.result==="pending"));
+   const unresolved=livePlayers.some(p=>p.result==="win"||p.result==="lose"||(p.pick&&p.result==="pending"));
+   const winnerReady=livePlayers.length===1&&!championConfirmed&&!unresolved;
+   const rolloverReady=livePlayers.length===0;
+   const roundButtonLabel=roundTransitionBusy
+    ?"Saving…"
+    :championConfirmed
+      ?"🏆 Winner Confirmed"
+      :winnerReady
+        ?"🏆 Confirm Winner"
+        :rolloverReady
+          ?"🔄 Start Rollover"
+          :"Start Next Round";
    return `<div class="actions">
     <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
-    <button class="secondary" onclick="startNextRound()" ${(roundTransitionBusy||championConfirmed)?"disabled":""}>${roundTransitionBusy?"Saving…":championConfirmed?"🏆 Winner Confirmed":winnerReady?"🏆 Confirm Winner":"Start Next Round"}</button>
+    <button class="secondary" onclick="startNextRound()" ${(roundTransitionBusy||championConfirmed)?"disabled":""}>${roundButtonLabel}</button>
     <button class="secondary" onclick="startNextCompetition()" ${competitionTransitionBusy?"disabled":""}>${competitionTransitionBusy?"Starting Competition…":"Start New Competition"}</button>
    </div>
-   ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner once to add them to the Hall of Fame and complete this competition.</div>`:championConfirmed?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>Winner confirmed.</strong> This competition is complete.</div>`:""}`;
+   ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner once to add them to the Hall of Fame and complete this competition.</div>`:rolloverReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>No players remain.</strong> Press Start Rollover to begin the rollover and reset eligible players for payment.</div>`:championConfirmed?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>Winner confirmed.</strong> This competition is complete.</div>`:""}`;
   })()}`;
 }
 

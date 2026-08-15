@@ -2572,7 +2572,10 @@ async function sendAutomaticPlayerPush(player,title,message,eventType="status",e
    throw new Error(`push-notifications HTTP ${response.status}: ${data?.error||data?.message||raw||"request failed"}`);
   }
   if(!data||data.success!==true){
-   throw new Error(data?.reason||data?.error||data?.message||`No notification sent. Response: ${raw||"empty"}`);
+   const detail=data?.reason||data?.error||
+    (Number(data?.subscriptions||0)===0?"No registered push subscription exists for this player.":null)||
+    `No notification was delivered (sent ${Number(data?.sent||0)}, failed ${Number(data?.failed||0)}).`;
+   throw new Error(detail);
   }
   return true;
  }catch(e){
@@ -3882,6 +3885,38 @@ async function registerPushSubscription(){
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
+
+ if(subscription){
+  try{
+   const expected=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+   const existingKey=subscription.options?.applicationServerKey
+    ?new Uint8Array(subscription.options.applicationServerKey)
+    :null;
+   const sameKey=existingKey &&
+    existingKey.length===expected.length &&
+    existingKey.every((value,index)=>value===expected[index]);
+
+   if(!sameKey){
+    const oldEndpoint=subscription.endpoint;
+    await subscription.unsubscribe();
+    try{
+     await supabaseClient.from("push_subscriptions").delete().eq("endpoint",oldEndpoint);
+    }catch(cleanErr){
+     console.warn("Old TEST push subscription cleanup failed",cleanErr);
+    }
+    subscription=null;
+   }
+  }catch(keyCheckErr){
+   console.warn("Could not verify existing VAPID subscription; recreating it",keyCheckErr);
+   try{
+    const oldEndpoint=subscription.endpoint;
+    await subscription.unsubscribe();
+    await supabaseClient.from("push_subscriptions").delete().eq("endpoint",oldEndpoint);
+   }catch(_){}
+   subscription=null;
+  }
+ }
+
  if(!subscription){
   subscription=await registration.pushManager.subscribe({
    userVisibleOnly:true,

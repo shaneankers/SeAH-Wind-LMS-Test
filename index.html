@@ -2904,7 +2904,9 @@ function renderTestRolloverJoinRequests(){
  </div></div>`;
 }
 function testRolloverPlayerCard(p){
- if(Number(state.rollover||0)<1||!p||p.alive||String(p.result||"")!=="waiting_rollover_application")return "";
+ if(Number(state.rollover||0)<1||!p||p.alive)return "";
+ const rolloverLateEntryStatus=["waiting_rollover_application","waiting_next_competition"];
+ if(!rolloverLateEntryStatus.includes(String(p.result||"")))return "";
  const fee=testRolloverJoinFee();
  const multiplier=testRolloverJoinMultiplier();
  const status=String(testMyRolloverRequest?.status||"").toLowerCase();
@@ -3547,7 +3549,13 @@ function myPick(){
  const rolloverJoinCard=testRolloverPlayerCard(p);
  if(rolloverJoinCard)return rolloverJoinCard;
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
- if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
+ if(isQueuedForNextCompetition(p)){
+  if(Number(state.rollover||0)>0){
+   const rolloverCard=testRolloverPlayerCard(p);
+   if(rolloverCard)return `${announcementCard}${rolloverCard}`;
+  }
+  return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
+ }
  return `${announcementCard}${buyBackCard}<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
@@ -5093,7 +5101,7 @@ async function startNextRound(){
     .filter(p=>p&&p.approved&&!p.adminPlayer&&testPlayerParticipated(p))
     .map(p=>({user_id:p.id,genuine_picks:testGenuineTeams(p)}));
 
-   if(!confirm(`Start TEST Rollover ${Number(state.rollover||0)+1}?\n\nThe ${rolloverRankingLength()}-team ranking will be frozen. Original participants return unpaid. Players who never entered stay out and may apply for £${testRolloverJoinFee(Number(state.rollover||0)+1)}.`)){
+   if(!confirm(`Start TEST Rollover ${Number(state.rollover||0)+1}?\n\nThe ${testRolloverRankingLength()}-team ranking will be frozen. Original participants return unpaid. Players who never entered stay out and may apply for £${testRolloverJoinFee(Number(state.rollover||0)+1)}.`)){
     roundTransitionBusy=false;render();return;
    }
 

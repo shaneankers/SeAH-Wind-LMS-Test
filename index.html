@@ -1416,8 +1416,95 @@ body.player-mode .badge.orange{
 .test-rollover-preview-row,.test-join-row{border:1px solid #e2e8f0;border-radius:14px;padding:11px 13px;background:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px}
 @media(max-width:700px){.test-ranking-grid{grid-template-columns:1fr}.test-rollover-preview-row,.test-join-row{display:block}.test-join-row .actions{margin-top:10px}}
 
+
+/* TEST v111 tidy team restrictions */
+.team-restrictions-card{
+ margin-top:14px;
+ border:1px solid #e2e8f0;
+ border-radius:16px;
+ background:#f8fafc;
+ overflow:hidden;
+}
+.team-restrictions-title{
+ padding:10px 13px;
+ border-bottom:1px solid #e2e8f0;
+ font-size:12px;
+ font-weight:1000;
+ color:#334155;
+ text-transform:uppercase;
+ letter-spacing:.045em;
+}
+.team-restrictions-grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:0;
+}
+.team-restrictions-section{
+ padding:11px 13px 12px;
+ min-width:0;
+}
+.team-restrictions-section+ .team-restrictions-section{
+ border-left:1px solid #e2e8f0;
+}
+.team-restrictions-label{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:8px;
+ margin-bottom:7px;
+ font-size:11px;
+ font-weight:950;
+ color:#64748b;
+}
+.team-restrictions-label span{
+ display:inline-flex;
+ min-width:22px;
+ height:22px;
+ padding:0 6px;
+ align-items:center;
+ justify-content:center;
+ border-radius:999px;
+ background:#e2e8f0;
+ color:#334155;
+ font-size:10px;
+}
+.team-restrictions-list{
+ display:flex;
+ flex-direction:column;
+ gap:5px;
+}
+.team-restriction-item{
+ padding:6px 8px;
+ border-radius:9px;
+ font-size:11px;
+ font-weight:850;
+ line-height:1.2;
+}
+.team-restriction-item.used{
+ background:#eef2f7;
+ color:#334155;
+}
+.team-restriction-item.banned{
+ background:#fff7ed;
+ color:#9a3412;
+ border:1px solid #fed7aa;
+}
+.team-restrictions-empty{
+ font-size:11px;
+ color:#94a3b8;
+ padding:4px 0;
+}
+@media(max-width:560px){
+ .team-restrictions-grid{grid-template-columns:1fr}
+ .team-restrictions-section+ .team-restrictions-section{
+  border-left:0;
+  border-top:1px solid #e2e8f0;
+ }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- TEST v111: tidy used-picks and rollover-ban display -->
 <!-- TEST v110: approved rollover entrants stay paid/alive after sync -->
 </head>
 <body>
@@ -3585,7 +3672,19 @@ function myPick(){
    <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${controlsDisabled?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
    <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;const banned=testPlayerRolloverBans(p).includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${(used||banned)?'disabled':''}>${escapeHtml(t)}${used?' (used)':banned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
   </div>
-  ${testPlayerRolloverBans(p).length?`<div class="notice" style="margin-top:12px"><strong>Rollover restrictions:</strong> ${testPlayerRolloverBans(p).map(escapeHtml).join(", ")}</div>`:""}
+  ${((Array.isArray(p.previous)&&p.previous.length)||testPlayerRolloverBans(p).length)?`<div class="team-restrictions-card">
+   <div class="team-restrictions-title">Team Restrictions</div>
+   <div class="team-restrictions-grid">
+    <div class="team-restrictions-section">
+     <div class="team-restrictions-label">Used Picks <span>${Array.isArray(p.previous)?p.previous.length:0}</span></div>
+     <div class="team-restrictions-list">${Array.isArray(p.previous)&&p.previous.length?p.previous.map(t=>`<div class="team-restriction-item used">${escapeHtml(t)}</div>`).join(""):`<div class="team-restrictions-empty">None</div>`}</div>
+    </div>
+    <div class="team-restrictions-section">
+     <div class="team-restrictions-label">Rollover Bans <span>${testPlayerRolloverBans(p).length}</span></div>
+     <div class="team-restrictions-list">${testPlayerRolloverBans(p).length?testPlayerRolloverBans(p).map(t=>`<div class="team-restriction-item banned">${escapeHtml(t)}</div>`).join(""):`<div class="team-restrictions-empty">None</div>`}</div>
+    </div>
+   </div>
+  </div>`:""}
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
  </div></div>`;

@@ -1418,6 +1418,7 @@ body.player-mode .badge.orange{
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- TEST v110: approved rollover entrants stay paid/alive after sync -->
 </head>
 <body>
 <div id="loginScreen"></div>
@@ -1693,6 +1694,7 @@ function shouldQueueForNextCompetition(p){
   competitionHasStarted()&&
   !p.adminPlayer&&
   p.adminOverrideActive!==true&&
+  p.paid!==true&&
   !playerHasCompetitionHistory(p)
  );
 }
